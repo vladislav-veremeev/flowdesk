@@ -1,14 +1,18 @@
-import type { User } from '@/entities'
-import { create } from 'zustand/react'
+import { create } from 'zustand'
+import type { User } from '@/entities/user'
 
-interface UserState {
+type UserState = {
     user: User | null
+    isAuthInitialized: boolean
     setUser: (user: User | null) => void
-    logout: () => void
+    clearUser: () => void
+    setAuthInitialized: (value: boolean) => void
 }
 
-export const useUserStore = create<UserState>((set) => ({
+export const userStore = create<UserState>((set) => ({
     user: null,
+    isAuthInitialized: false,
     setUser: (user) => set({ user }),
-    logout: () => set({ user: null }),
+    clearUser: () => set({ user: null }),
+    setAuthInitialized: (value) => set({ isAuthInitialized: value }),
 }))

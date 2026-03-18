@@ -1,12 +1,50 @@
-import type { AuthResponse, LoginDto, RegisterDto } from '@/features/auth'
-import { baseApi } from '@/shared/api'
+import { api } from '@/shared/api'
+import type { User } from '@/entities/user'
 
-export const login = async (data: LoginDto) => {
-    const response = await baseApi.post<AuthResponse>('/auth/login', data)
+type AuthResponse = {
+    user: User
+    token: string
+}
+
+type LoginPayload = {
+    email: string
+    password: string
+}
+
+type RegisterPayload = {
+    username: string
+    email: string
+    password: string
+}
+
+type UpdateMePayload = {
+    username: string
+    email: string
+    currentPassword?: string
+    newPassword?: string
+}
+
+export const login = async (payload: LoginPayload) => {
+    const response = await api.post<AuthResponse>('/auth/login', payload)
     return response.data
 }
 
-export const register = async (data: RegisterDto) => {
-    const response = await baseApi.post<AuthResponse>('/auth/register', data)
+export const register = async (payload: RegisterPayload) => {
+    const response = await api.post<AuthResponse>('/auth/register', payload)
+    return response.data
+}
+
+export const getMe = async () => {
+    const response = await api.get<User>('/auth/me')
+    return response.data
+}
+
+export const updateMe = async (payload: UpdateMePayload) => {
+    const response = await api.put<User>('/auth/me', payload)
+    return response.data
+}
+
+export const deleteMe = async () => {
+    const response = await api.delete<{ message: string }>('/auth/me')
     return response.data
 }

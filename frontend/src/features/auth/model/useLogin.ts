@@ -1,17 +1,19 @@
-import { useUserStore } from '@/entities/user'
-import { login } from '@/features/auth'
+import { useNavigate } from 'react-router-dom'
+import { userStore } from '@/entities/user'
+import { login } from '../api/authApi'
+import type { LoginDto } from './types'
 
 export const useLogin = () => {
-    const setUser = useUserStore((s) => s.setUser)
+    const setUser = userStore((state) => state.setUser)
+    const navigate = useNavigate()
 
-    const handleLogin = async (data: { email: string; password: string }) => {
-        try {
-            const res = await login(data)
-            localStorage.setItem('token', res.accessToken)
-            setUser(res.user)
-        } catch (e) {
-            console.error('Login failed', e)
-        }
+    const handleLogin = async (data: LoginDto) => {
+        const result = await login(data)
+
+        localStorage.setItem('token', result.token)
+        setUser(result.user)
+
+        navigate('/')
     }
 
     return { handleLogin }

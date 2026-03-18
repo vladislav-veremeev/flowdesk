@@ -1,21 +1,19 @@
-import { register } from '@/features/auth'
-import { useUserStore } from '@/entities/user'
+import { useNavigate } from 'react-router-dom'
+import { userStore } from '@/entities/user'
+import { register } from '../api/authApi'
+import type { RegisterDto } from './types'
 
 export const useRegister = () => {
-    const setUser = useUserStore((s) => s.setUser)
+    const setUser = userStore((state) => state.setUser)
+    const navigate = useNavigate()
 
-    const handleRegister = async (data: {
-        email: string
-        password: string
-        name: string
-    }) => {
-        try {
-            const res = await register(data)
-            localStorage.setItem('token', res.accessToken)
-            setUser(res.user)
-        } catch (e) {
-            console.error('Registration failed', e)
-        }
+    const handleRegister = async (data: RegisterDto) => {
+        const result = await register(data)
+
+        localStorage.setItem('token', result.token)
+        setUser(result.user)
+
+        navigate('/')
     }
 
     return { handleRegister }
