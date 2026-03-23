@@ -1,0 +1,52 @@
+export type TaskPriority = "low" | "medium" | "high";
+
+export type TaskRow = {
+    id: string;
+    title: string;
+    description: string | null;
+    priority: TaskPriority;
+    position: number;
+    board_id: string;
+    column_id: string;
+    assignee_id: string | null;
+    due_date: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateTaskBody = {
+    title: string;
+    description?: string;
+    priority?: TaskPriority;
+    boardId: string;
+    columnId: string;
+    assigneeId?: string | null;
+    dueDate?: string | null;
+};
+
+export type UpdateTaskBody = {
+    title: string;
+    description?: string;
+    priority?: TaskPriority;
+    assigneeId?: string | null;
+    dueDate?: string | null;
+};
+
+export type MoveTaskBody = {
+    targetColumnId: string;
+    targetPosition: number;
+};
+
+export type Task = {
+    id: string;
+    title: string;
+    description: string | null;
+    priority: TaskPriority;
+    position: number;
+    boardId: string;
+    columnId: string;
+    assigneeId: string | null;
+    dueDate: string | null;
+    createdAt: string;
+    updatedAt: string;
+};

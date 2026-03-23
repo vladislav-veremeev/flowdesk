@@ -21,10 +21,12 @@ export type UserRow = {
     username: string;
     email: string;
     password_hash: string;
+    created_at: string;
 };
 
 export type SafeUser = {
     id: string;
     username: string;
     email: string;
+    createdAt: string;
 };

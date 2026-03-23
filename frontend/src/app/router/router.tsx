@@ -5,6 +5,7 @@ import { RegisterPage } from '@/pages/register'
 import { ProtectedRoute } from './ProtectedRoute'
 import { AppLayout } from './layouts'
 import { ProfilePage } from '@/pages/profile'
+import { HomePage } from '@/pages/home'
 
 export const router = createBrowserRouter([
     {
@@ -32,7 +33,7 @@ export const router = createBrowserRouter([
         children: [
             {
                 path: '/',
-                element: <></>,
+                element: <HomePage />,
             },
             {
                 path: '/profile',

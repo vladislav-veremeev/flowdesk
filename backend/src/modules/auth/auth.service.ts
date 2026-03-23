@@ -21,6 +21,15 @@ function validatePassword(password: string): boolean {
     return password.length >= 6;
 }
 
+function toSafeUser(user: Pick<UserRow, "id" | "username" | "email" | "created_at">): SafeUser {
+    return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        createdAt: user.created_at,
+    };
+}
+
 export async function registerUser(data: RegisterBody) {
     const username = data.username.trim();
     const email = data.email.trim().toLowerCase();
@@ -39,7 +48,7 @@ export async function registerUser(data: RegisterBody) {
     }
 
     const existingByUsername = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash FROM users WHERE username = $1",
+        "SELECT id, username, email, password_hash, created_at FROM users WHERE username = $1",
         [username]
     );
 
@@ -48,7 +57,7 @@ export async function registerUser(data: RegisterBody) {
     }
 
     const existingByEmail = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash FROM users WHERE email = $1",
+        "SELECT id, username, email, password_hash, created_at FROM users WHERE email = $1",
         [email]
     );
 
@@ -62,7 +71,7 @@ export async function registerUser(data: RegisterBody) {
         `
             INSERT INTO users (username, email, password_hash)
             VALUES ($1, $2, $3)
-                RETURNING id, username, email, password_hash
+            RETURNING id, username, email, password_hash, created_at
         `,
         [username, email, passwordHash]
     );
@@ -76,11 +85,7 @@ export async function registerUser(data: RegisterBody) {
     });
 
     return {
-        user: {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-        } satisfies SafeUser,
+        user: toSafeUser(user),
         token,
     };
 }
@@ -90,7 +95,7 @@ export async function loginUser(data: LoginBody) {
     const password = data.password;
 
     const userResult = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash FROM users WHERE email = $1",
+        "SELECT id, username, email, password_hash, created_at FROM users WHERE email = $1",
         [email]
     );
 
@@ -113,22 +118,20 @@ export async function loginUser(data: LoginBody) {
     });
 
     return {
-        user: {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-        } satisfies SafeUser,
+        user: toSafeUser(user),
         token,
     };
 }
 
 export async function getCurrentUser(userId: string): Promise<SafeUser | null> {
-    const result = await pool.query<SafeUser>(
-        "SELECT id, username, email FROM users WHERE id = $1",
+    const result = await pool.query<UserRow>(
+        "SELECT id, username, email, password_hash, created_at FROM users WHERE id = $1",
         [userId]
     );
 
-    return result.rows[0] || null;
+    const user = result.rows[0];
+
+    return user ? toSafeUser(user) : null;
 }
 
 export async function updateCurrentUser(
@@ -149,7 +152,7 @@ export async function updateCurrentUser(
     }
 
     const currentUserResult = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash FROM users WHERE id = $1",
+        "SELECT id, username, email, password_hash, created_at FROM users WHERE id = $1",
         [userId]
     );
 
@@ -159,8 +162,8 @@ export async function updateCurrentUser(
         throw new Error("Пользователь не найден");
     }
 
-    const existingByUsername = await pool.query<SafeUser>(
-        "SELECT id, username, email FROM users WHERE username = $1 AND id <> $2",
+    const existingByUsername = await pool.query<UserRow>(
+        "SELECT id, username, email, password_hash, created_at FROM users WHERE username = $1 AND id <> $2",
         [username, userId]
     );
 
@@ -168,8 +171,8 @@ export async function updateCurrentUser(
         throw new Error("Пользователь с таким username уже существует");
     }
 
-    const existingByEmail = await pool.query<SafeUser>(
-        "SELECT id, username, email FROM users WHERE email = $1 AND id <> $2",
+    const existingByEmail = await pool.query<UserRow>(
+        "SELECT id, username, email, password_hash, created_at FROM users WHERE email = $1 AND id <> $2",
         [email, userId]
     );
 
@@ -200,12 +203,12 @@ export async function updateCurrentUser(
         passwordHash = await bcrypt.hash(newPassword, 10);
     }
 
-    const updatedUserResult = await pool.query<SafeUser>(
+    const updatedUserResult = await pool.query<UserRow>(
         `
             UPDATE users
             SET username = $1, email = $2, password_hash = $3
             WHERE id = $4
-                RETURNING id, username, email
+            RETURNING id, username, email, password_hash, created_at
         `,
         [username, email, passwordHash, userId]
     );
@@ -216,7 +219,7 @@ export async function updateCurrentUser(
         throw new Error("Не удалось обновить пользователя");
     }
 
-    return updatedUser;
+    return toSafeUser(updatedUser);
 }
 
 export async function deleteCurrentUser(userId: string): Promise<void> {

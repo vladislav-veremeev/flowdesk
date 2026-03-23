@@ -11,7 +11,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     const isAuthInitialized = userStore((state) => state.isAuthInitialized)
 
     if (!isAuthInitialized) {
-        return <div>Загрузка...</div>
+        return
     }
 
     if (!user) {

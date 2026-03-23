@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 import authRouter from "./modules/auth/auth.routes";
+import boardsRouter from "./modules/boards/boards.routes";
+import columnsRouter from "./modules/columns/columns.routes";
+import tasksRouter from "./modules/tasks/tasks.routes";
 
 const app = express();
 
@@ -19,5 +22,8 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/auth", authRouter);
+app.use("/boards", boardsRouter);
+app.use("/columns", columnsRouter);
+app.use("/tasks", tasksRouter);
 
 export default app;

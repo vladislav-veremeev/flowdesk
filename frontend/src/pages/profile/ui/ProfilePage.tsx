@@ -2,6 +2,7 @@ import { userStore } from '@/entities/user'
 import {
     Card,
     CardContent,
+    CardDescription,
     CardFooter,
     CardHeader,
     CardTitle,
@@ -14,7 +15,7 @@ import {
     FieldLabel,
 } from '@/components/ui/field.tsx'
 import { deleteMe, updateMe } from '@/features/auth'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import z from 'zod'
@@ -31,15 +32,23 @@ import {
 } from '@/components/ui/alert-dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { toast } from 'sonner'
+import { formatDateTime } from '@/shared/lib'
+import { Pencil, Save, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 const profileSchema = z
     .object({
         username: z
             .string()
+            .trim()
             .min(1, 'Введите имя пользователя')
             .min(3, 'Имя пользователя должно содержать минимум 3 символа'),
 
-        email: z.string().min(1, 'Введите email').email('Некорректный email'),
+        email: z
+            .string()
+            .trim()
+            .min(1, 'Введите email')
+            .email('Некорректный email'),
         currentPassword: z.string().optional(),
         newPassword: z.string().optional(),
     })
@@ -77,7 +86,9 @@ const profileSchema = z
 type ProfileFormValues = z.infer<typeof profileSchema>
 
 export const ProfilePage = () => {
+    const navigate = useNavigate()
     const user = userStore((state) => state.user)
+    const [isEditing, setIsEditing] = useState<boolean>(false)
 
     const form = useForm<ProfileFormValues>({
         resolver: zodResolver(profileSchema),
@@ -91,17 +102,30 @@ export const ProfilePage = () => {
 
     const onSubmit = async (data: ProfileFormValues) => {
         try {
-            const updatedUser = await updateMe(data)
-            userStore.getState().setUser(updatedUser)
-            toast.success('Профиль успешно сохранен')
-        } catch (error: any) {
-            toast.error(error.response?.data?.message)
-        }
-    }
+            const payload = {
+                username: data.username,
+                email: data.email,
+                currentPassword: data.currentPassword || undefined,
+                newPassword: data.newPassword || undefined,
+            }
 
-    const handleLogout = () => {
-        localStorage.removeItem('token')
-        userStore.getState().clearUser()
+            const updatedUser = await updateMe(payload)
+            userStore.getState().setUser(updatedUser)
+
+            form.reset({
+                username: updatedUser.username,
+                email: updatedUser.email,
+                currentPassword: '',
+                newPassword: '',
+            })
+
+            toast.success('Профиль успешно сохранен')
+            setIsEditing(false)
+        } catch (error: any) {
+            toast.error(
+                error.response?.data?.message || 'Ошибка обновления профиля'
+            )
+        }
     }
 
     const handleDelete = async () => {
@@ -109,8 +133,11 @@ export const ProfilePage = () => {
             await deleteMe()
             localStorage.removeItem('token')
             userStore.getState().clearUser()
+            navigate('/login')
         } catch (error: any) {
-            toast.error(error.response?.data?.message)
+            toast.error(
+                error.response?.data?.message || 'Ошибка удаления аккаунта'
+            )
         }
     }
 
@@ -124,156 +151,253 @@ export const ProfilePage = () => {
     }, [user, form])
 
     return (
-        <div className="flex justify-center py-8">
+        <div className="flex justify-center py-6">
             <Card className="w-xl">
                 <CardHeader>
-                    <CardTitle>Профиль</CardTitle>
+                    <CardTitle>
+                        {isEditing ? 'Редактирование профиля' : 'Профиль'}
+                    </CardTitle>
+                    <CardDescription>
+                        {isEditing
+                            ? 'Измените имя пользователя, почту или пароль.'
+                            : 'Данные о пользователе.'}
+                    </CardDescription>
                 </CardHeader>
 
                 <CardContent>
                     <form id="form" onSubmit={form.handleSubmit(onSubmit)}>
-                        <FieldGroup>
-                            <Controller
-                                name="username"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <FieldLabel htmlFor="username">
+                        <FieldGroup className="gap-6">
+                            {isEditing ? (
+                                <>
+                                    <Controller
+                                        name="username"
+                                        control={form.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={
+                                                    fieldState.invalid
+                                                }
+                                            >
+                                                <FieldLabel htmlFor="username">
+                                                    Имя пользователя
+                                                </FieldLabel>
+                                                <Input
+                                                    {...field}
+                                                    id="username"
+                                                    placeholder="Введите имя пользователя"
+                                                    aria-invalid={
+                                                        fieldState.invalid
+                                                    }
+                                                />
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[
+                                                            fieldState.error,
+                                                        ]}
+                                                    />
+                                                )}
+                                            </Field>
+                                        )}
+                                    />
+
+                                    <Controller
+                                        name="email"
+                                        control={form.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={
+                                                    fieldState.invalid
+                                                }
+                                            >
+                                                <FieldLabel htmlFor="email">
+                                                    Email
+                                                </FieldLabel>
+                                                <Input
+                                                    {...field}
+                                                    id="email"
+                                                    type="email"
+                                                    placeholder="Введите email"
+                                                    aria-invalid={
+                                                        fieldState.invalid
+                                                    }
+                                                />
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[
+                                                            fieldState.error,
+                                                        ]}
+                                                    />
+                                                )}
+                                            </Field>
+                                        )}
+                                    />
+
+                                    <Controller
+                                        name="currentPassword"
+                                        control={form.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={
+                                                    fieldState.invalid
+                                                }
+                                            >
+                                                <FieldLabel htmlFor="currentPassword">
+                                                    Текущий пароль
+                                                </FieldLabel>
+                                                <Input
+                                                    {...field}
+                                                    id="currentPassword"
+                                                    type="password"
+                                                    placeholder="Введите текущий пароль"
+                                                    aria-invalid={
+                                                        fieldState.invalid
+                                                    }
+                                                />
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[
+                                                            fieldState.error,
+                                                        ]}
+                                                    />
+                                                )}
+                                            </Field>
+                                        )}
+                                    />
+
+                                    <Controller
+                                        name="newPassword"
+                                        control={form.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={
+                                                    fieldState.invalid
+                                                }
+                                            >
+                                                <FieldLabel htmlFor="newPassword">
+                                                    Новый пароль
+                                                </FieldLabel>
+                                                <Input
+                                                    {...field}
+                                                    id="newPassword"
+                                                    type="password"
+                                                    placeholder="Введите новый пароль"
+                                                    aria-invalid={
+                                                        fieldState.invalid
+                                                    }
+                                                />
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[
+                                                            fieldState.error,
+                                                        ]}
+                                                    />
+                                                )}
+                                            </Field>
+                                        )}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <Field>
+                                        <FieldLabel>
                                             Имя пользователя
                                         </FieldLabel>
-                                        <Input
-                                            {...field}
-                                            id="username"
-                                            placeholder="Введите имя пользователя"
-                                            aria-invalid={fieldState.invalid}
-                                        />
-                                        {fieldState.invalid && (
-                                            <FieldError
-                                                errors={[fieldState.error]}
-                                            />
-                                        )}
+                                        <p>{user?.username}</p>
                                     </Field>
-                                )}
-                            />
 
-                            <Controller
-                                name="email"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <FieldLabel htmlFor="email">
-                                            Email
-                                        </FieldLabel>
-                                        <Input
-                                            {...field}
-                                            id="email"
-                                            type="email"
-                                            placeholder="Введите email"
-                                            aria-invalid={fieldState.invalid}
-                                        />
-                                        {fieldState.invalid && (
-                                            <FieldError
-                                                errors={[fieldState.error]}
-                                            />
-                                        )}
+                                    <Field>
+                                        <FieldLabel>Email</FieldLabel>
+                                        <p>{user?.email}</p>
                                     </Field>
-                                )}
-                            />
 
-                            <Controller
-                                name="currentPassword"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <FieldLabel htmlFor="currentPassword">
-                                            Текущий пароль
+                                    <Field>
+                                        <FieldLabel>
+                                            Дата регистрации
                                         </FieldLabel>
-                                        <Input
-                                            {...field}
-                                            id="currentPassword"
-                                            type="password"
-                                            placeholder="Введите текущий пароль"
-                                            aria-invalid={fieldState.invalid}
-                                        />
-                                        {fieldState.invalid && (
-                                            <FieldError
-                                                errors={[fieldState.error]}
-                                            />
-                                        )}
+                                        <p>{formatDateTime(user?.createdAt)}</p>
                                     </Field>
-                                )}
-                            />
-
-                            <Controller
-                                name="newPassword"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <FieldLabel htmlFor="newPassword">
-                                            Новый пароль
-                                        </FieldLabel>
-                                        <Input
-                                            {...field}
-                                            id="newPassword"
-                                            type="password"
-                                            placeholder="Введите новый пароль"
-                                            aria-invalid={fieldState.invalid}
-                                        />
-                                        {fieldState.invalid && (
-                                            <FieldError
-                                                errors={[fieldState.error]}
-                                            />
-                                        )}
-                                    </Field>
-                                )}
-                            />
+                                </>
+                            )}
                         </FieldGroup>
                     </form>
                 </CardContent>
 
-                <CardFooter className="flex flex-col gap-3">
+                <CardFooter>
                     <Field orientation="horizontal">
-                        <Button type="submit" form="form">
-                            Сохранить
-                        </Button>
-
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="ml-auto"
-                            onClick={handleLogout}
-                        >
-                            Выйти
-                        </Button>
-
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button type="button" variant="outline">
-                                    Удалить аккаунт
+                        {isEditing ? (
+                            <>
+                                <Button
+                                    type="submit"
+                                    form="form"
+                                    variant="outline"
+                                >
+                                    <Save />
+                                    Сохранить
                                 </Button>
-                            </AlertDialogTrigger>
 
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                        Удалить аккаунт?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Это действие нельзя отменить. Аккаунт и
-                                        связанные с ним данные будут удалены.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        form.reset({
+                                            username: user?.username ?? '',
+                                            email: user?.email ?? '',
+                                            currentPassword: '',
+                                            newPassword: '',
+                                        })
+                                        setIsEditing(false)
+                                    }}
+                                >
+                                    Отмена
+                                </Button>
+                            </>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={() => setIsEditing(true)}
+                                variant="outline"
+                            >
+                                <Pencil />
+                                Редактировать
+                            </Button>
+                        )}
 
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                        Отмена
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleDelete}>
+                        {!isEditing && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button type="button" variant="outline">
+                                        <Trash2 />
                                         Удалить
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                                    </Button>
+                                </AlertDialogTrigger>
+
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                            Удалить аккаунт?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Это действие нельзя отменить.
+                                            Аккаунт и связанные с ним данные
+                                            будут удалены.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>
+                                            Отмена
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                            variant="outline"
+                                            onClick={handleDelete}
+                                        >
+                                            <Trash2 />
+                                            Удалить
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
                     </Field>
                 </CardFooter>
             </Card>
