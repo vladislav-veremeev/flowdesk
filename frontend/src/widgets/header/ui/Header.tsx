@@ -15,8 +15,8 @@ export const Header = () => {
     }
 
     return (
-        <header className="flex p-6 items-center justify-between border bg-background shadow-sm">
-            <Link to="/" className="text-xl font-semibold">
+        <header className="flex py-4 px-6 items-center justify-between border-b">
+            <Link to="/" className="text-primary text-xl font-semibold">
                 flowdesk
             </Link>
 

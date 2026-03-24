@@ -166,7 +166,7 @@ export const ProfilePage = () => {
 
                 <CardContent>
                     <form id="form" onSubmit={form.handleSubmit(onSubmit)}>
-                        <FieldGroup className="gap-6">
+                        <FieldGroup>
                             {isEditing ? (
                                 <>
                                     <Controller
@@ -302,19 +302,23 @@ export const ProfilePage = () => {
                                         <FieldLabel>
                                             Имя пользователя
                                         </FieldLabel>
-                                        <p>{user?.username}</p>
+                                        <p className="text-sm">
+                                            {user?.username}
+                                        </p>
                                     </Field>
 
                                     <Field>
                                         <FieldLabel>Email</FieldLabel>
-                                        <p>{user?.email}</p>
+                                        <p className="text-sm">{user?.email}</p>
                                     </Field>
 
                                     <Field>
                                         <FieldLabel>
                                             Дата регистрации
                                         </FieldLabel>
-                                        <p>{formatDateTime(user?.createdAt)}</p>
+                                        <p className="text-sm">
+                                            {formatDateTime(user?.createdAt)}
+                                        </p>
                                     </Field>
                                 </>
                             )}
@@ -326,11 +330,7 @@ export const ProfilePage = () => {
                     <Field orientation="horizontal">
                         {isEditing ? (
                             <>
-                                <Button
-                                    type="submit"
-                                    form="form"
-                                    variant="outline"
-                                >
+                                <Button type="submit" form="form">
                                     <Save />
                                     Сохранить
                                 </Button>
@@ -365,7 +365,11 @@ export const ProfilePage = () => {
                         {!isEditing && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button type="button" variant="outline">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="ml-auto"
+                                    >
                                         <Trash2 />
                                         Удалить
                                     </Button>
@@ -388,8 +392,8 @@ export const ProfilePage = () => {
                                             Отмена
                                         </AlertDialogCancel>
                                         <AlertDialogAction
-                                            variant="outline"
                                             onClick={handleDelete}
+                                            variant="destructive"
                                         >
                                             <Trash2 />
                                             Удалить

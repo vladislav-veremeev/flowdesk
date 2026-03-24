@@ -6,6 +6,7 @@ import { ProtectedRoute } from './ProtectedRoute'
 import { AppLayout } from './layouts'
 import { ProfilePage } from '@/pages/profile'
 import { HomePage } from '@/pages/home'
+import { BoardPage } from '@/pages/board'
 
 export const router = createBrowserRouter([
     {
@@ -34,6 +35,10 @@ export const router = createBrowserRouter([
             {
                 path: '/',
                 element: <HomePage />,
+            },
+            {
+                path: '/boards/:id',
+                element: <BoardPage />,
             },
             {
                 path: '/profile',

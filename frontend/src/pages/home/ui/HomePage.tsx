@@ -1,44 +1,17 @@
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-
 import type { Board } from '@/entities/board'
+import { BoardCard, type BoardFormValues } from '@/entities/board'
 import {
     createBoard,
+    CreateBoardCard,
     deleteBoard,
     getBoards,
     updateBoard,
 } from '@/features/boards'
-import { Button } from '@/components/ui/button'
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card'
-import {
-    Field,
-    FieldError,
-    FieldGroup,
-    FieldLabel,
-} from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { formatDateTime } from '@/shared/lib'
-import {
-    Popover,
-    PopoverContent,
-    PopoverDescription,
-    PopoverHeader,
-    PopoverTitle,
-    PopoverTrigger,
-} from '@/components/ui/popover.tsx'
-import { Textarea } from '@/components/ui/textarea.tsx'
-import { Link } from 'react-router-dom'
 
 const boardSchema = z.object({
     title: z
@@ -50,8 +23,6 @@ const boardSchema = z.object({
         .string()
         .max(500, 'Описание должно содержать не более 500 символов'),
 })
-
-type BoardFormValues = z.infer<typeof boardSchema>
 
 const defaultValues: BoardFormValues = {
     title: '',
@@ -173,283 +144,30 @@ export const HomePage = () => {
     }
 
     return (
-        <div className="flex flex-col py-6 px-6 gap-6">
+        <div className="flex flex-col p-6 gap-6">
             <h1 className="font-medium text-xl">Мои доски</h1>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {boards.map((board) => (
-                    <Card key={board.id} className="h-fit">
-                        <Link to={'/profile'}>
-                            <CardHeader>
-                                <CardTitle>{board.title}</CardTitle>
-                                <CardDescription>
-                                    Создана {formatDateTime(board.createdAt)}
-                                </CardDescription>
-                            </CardHeader>
-                        </Link>
-
-                        <CardContent>
-                            <p className="text-muted-foreground wrap-break-word">
-                                {board.description || 'Описание отсутствует'}
-                            </p>
-                        </CardContent>
-
-                        <CardFooter>
-                            <Field orientation="horizontal">
-                                <Popover
-                                    open={editOpenBoardId === board.id}
-                                    onOpenChange={(open) => {
-                                        if (open) {
-                                            handleOpenEdit(board)
-                                        } else if (
-                                            editOpenBoardId === board.id
-                                        ) {
-                                            resetEditForm()
-                                        }
-                                    }}
-                                >
-                                    <PopoverTrigger asChild>
-                                        <Button type="button" variant="outline">
-                                            <Pencil />
-                                            Редактировать
-                                        </Button>
-                                    </PopoverTrigger>
-
-                                    <PopoverContent className="flex flex-col gap-4">
-                                        <PopoverHeader>
-                                            <PopoverTitle>
-                                                Редактирование доски
-                                            </PopoverTitle>
-                                            <PopoverDescription>
-                                                Измените название и описание
-                                                выбранной доски
-                                            </PopoverDescription>
-                                        </PopoverHeader>
-
-                                        <form
-                                            id={`edit-board-form-${board.id}`}
-                                            onSubmit={editForm.handleSubmit(
-                                                handleEdit
-                                            )}
-                                        >
-                                            <FieldGroup className="gap-4">
-                                                <Controller
-                                                    name="title"
-                                                    control={editForm.control}
-                                                    render={({
-                                                        field,
-                                                        fieldState,
-                                                    }) => (
-                                                        <Field
-                                                            data-invalid={
-                                                                fieldState.invalid
-                                                            }
-                                                        >
-                                                            <FieldLabel
-                                                                htmlFor={`edit-board-title-${board.id}`}
-                                                            >
-                                                                Название
-                                                            </FieldLabel>
-                                                            <Input
-                                                                {...field}
-                                                                id={`edit-board-title-${board.id}`}
-                                                                placeholder="Введите название"
-                                                                aria-invalid={
-                                                                    fieldState.invalid
-                                                                }
-                                                            />
-                                                            {fieldState.invalid && (
-                                                                <FieldError
-                                                                    errors={[
-                                                                        fieldState.error,
-                                                                    ]}
-                                                                />
-                                                            )}
-                                                        </Field>
-                                                    )}
-                                                />
-
-                                                <Controller
-                                                    name="description"
-                                                    control={editForm.control}
-                                                    render={({
-                                                        field,
-                                                        fieldState,
-                                                    }) => (
-                                                        <Field
-                                                            data-invalid={
-                                                                fieldState.invalid
-                                                            }
-                                                        >
-                                                            <FieldLabel
-                                                                htmlFor={`edit-board-description-${board.id}`}
-                                                            >
-                                                                Описание
-                                                            </FieldLabel>
-                                                            <Textarea
-                                                                {...field}
-                                                                id={`edit-board-description-${board.id}`}
-                                                                placeholder="Введите описание"
-                                                                aria-invalid={
-                                                                    fieldState.invalid
-                                                                }
-                                                            />
-                                                            {fieldState.invalid && (
-                                                                <FieldError
-                                                                    errors={[
-                                                                        fieldState.error,
-                                                                    ]}
-                                                                />
-                                                            )}
-                                                        </Field>
-                                                    )}
-                                                />
-                                            </FieldGroup>
-                                        </form>
-
-                                        <Field orientation="horizontal">
-                                            <Button
-                                                type="submit"
-                                                form={`edit-board-form-${board.id}`}
-                                                variant="outline"
-                                            >
-                                                <Save />
-                                                Сохранить
-                                            </Button>
-
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={resetEditForm}
-                                            >
-                                                Отмена
-                                            </Button>
-                                        </Field>
-                                    </PopoverContent>
-                                </Popover>
-
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => handleDelete(board.id)}
-                                >
-                                    <Trash2 />
-                                    Удалить
-                                </Button>
-                            </Field>
-                        </CardFooter>
-                    </Card>
+                    <BoardCard
+                        key={board.id}
+                        board={board}
+                        editOpenBoardId={editOpenBoardId}
+                        editForm={editForm}
+                        onOpenEdit={handleOpenEdit}
+                        onResetEditForm={resetEditForm}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                    />
                 ))}
 
-                <Card className="p-0 min-h-50">
-                    <Popover
-                        open={createOpen}
-                        onOpenChange={(open) => {
-                            setCreateOpen(open)
-
-                            if (!open) {
-                                resetCreateForm()
-                            }
-                        }}
-                    >
-                        <PopoverTrigger asChild>
-                            <Button variant="ghost" className="w-full h-full">
-                                <Plus />
-                                <p className="text-base">Создать</p>
-                            </Button>
-                        </PopoverTrigger>
-
-                        <PopoverContent className="flex flex-col gap-4">
-                            <PopoverHeader>
-                                <PopoverTitle>Новая доска</PopoverTitle>
-                                <PopoverDescription>
-                                    Создайте доску для задач, заметок или
-                                    командной работы.
-                                </PopoverDescription>
-                            </PopoverHeader>
-
-                            <form
-                                id="create-board-form"
-                                onSubmit={createForm.handleSubmit(handleAdd)}
-                            >
-                                <FieldGroup className="gap-4">
-                                    <Controller
-                                        name="title"
-                                        control={createForm.control}
-                                        render={({ field, fieldState }) => (
-                                            <Field
-                                                data-invalid={
-                                                    fieldState.invalid
-                                                }
-                                            >
-                                                <FieldLabel htmlFor="create-board-title">
-                                                    Название
-                                                </FieldLabel>
-                                                <Input
-                                                    {...field}
-                                                    id="create-board-title"
-                                                    placeholder="Введите название"
-                                                    aria-invalid={
-                                                        fieldState.invalid
-                                                    }
-                                                />
-                                                {fieldState.invalid && (
-                                                    <FieldError
-                                                        errors={[
-                                                            fieldState.error,
-                                                        ]}
-                                                    />
-                                                )}
-                                            </Field>
-                                        )}
-                                    />
-
-                                    <Controller
-                                        name="description"
-                                        control={createForm.control}
-                                        render={({ field, fieldState }) => (
-                                            <Field
-                                                data-invalid={
-                                                    fieldState.invalid
-                                                }
-                                            >
-                                                <FieldLabel htmlFor="create-board-description">
-                                                    Описание
-                                                </FieldLabel>
-                                                <Textarea
-                                                    {...field}
-                                                    id="create-board-description"
-                                                    placeholder="Введите описание"
-                                                    aria-invalid={
-                                                        fieldState.invalid
-                                                    }
-                                                />
-                                                {fieldState.invalid && (
-                                                    <FieldError
-                                                        errors={[
-                                                            fieldState.error,
-                                                        ]}
-                                                    />
-                                                )}
-                                            </Field>
-                                        )}
-                                    />
-                                </FieldGroup>
-                            </form>
-
-                            <Field orientation="horizontal">
-                                <Button
-                                    type="submit"
-                                    form="create-board-form"
-                                    variant="outline"
-                                >
-                                    <Plus />
-                                    Создать
-                                </Button>
-                            </Field>
-                        </PopoverContent>
-                    </Popover>
-                </Card>
+                <CreateBoardCard
+                    open={createOpen}
+                    onOpenChange={setCreateOpen}
+                    form={createForm}
+                    onSubmit={handleAdd}
+                    onReset={resetCreateForm}
+                />
             </div>
         </div>
     )

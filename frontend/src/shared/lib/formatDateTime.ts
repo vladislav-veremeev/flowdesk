@@ -1,10 +1,11 @@
 export const formatDateTime = (value?: string) => {
-    if (!value) return '—'
+    if (!value) return ''
 
     return new Date(value).toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
+        timeZone: 'Europe/Minsk',
         year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
     })
