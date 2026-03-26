@@ -33,6 +33,12 @@ export const updateColumn = async (
     return response.data
 }
 
+export const reorderColumns = async (boardId: string, orderedIds: string[]) => {
+    await api.patch(`/columns/reorder/${boardId}`, {
+        orderedIds,
+    })
+}
+
 export const deleteColumn = async (columnId: string) => {
     await api.delete(`/columns/${columnId}`)
 }

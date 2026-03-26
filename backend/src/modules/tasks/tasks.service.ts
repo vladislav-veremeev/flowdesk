@@ -6,6 +6,7 @@ import {
     TaskRow,
     UpdateTaskBody,
 } from "./tasks.types";
+import { ensureBoardMember } from "../boards/boards.access";
 
 function mapTask(row: TaskRow): Task {
     return {
@@ -21,17 +22,6 @@ function mapTask(row: TaskRow): Task {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
-}
-
-async function ensureBoardOwner(boardId: string, userId: string) {
-    const result = await pool.query(
-        "SELECT id FROM boards WHERE id = $1 AND owner_id = $2",
-        [boardId, userId]
-    );
-
-    if (result.rows.length === 0) {
-        throw new Error("Доска не найдена");
-    }
 }
 
 async function ensureColumnBelongsToBoard(columnId: string, boardId: string) {
@@ -67,12 +57,32 @@ async function checkWipLimit(columnId: string) {
     const currentCount = Number(countResult.rows[0].count);
 
     if (currentCount >= wipLimit) {
-        throw new Error("Превышен WIP-лимит колонки");
+        throw new Error("Превышен лимит задач колонки");
+    }
+}
+
+async function ensureAssigneeIsBoardMember(
+    boardId: string,
+    assigneeId: string | null | undefined
+) {
+    if (!assigneeId) {
+        return;
+    }
+
+    const result = await pool.query(
+        `SELECT 1
+         FROM board_members
+         WHERE board_id = $1 AND user_id = $2`,
+        [boardId, assigneeId]
+    );
+
+    if (result.rows.length === 0) {
+        throw new Error("Исполнитель должен быть участником доски");
     }
 }
 
 export async function getTasksByBoard(userId: string, boardId: string): Promise<Task[]> {
-    await ensureBoardOwner(boardId, userId);
+    await ensureBoardMember(boardId, userId);
 
     const result = await pool.query<TaskRow>(
         `SELECT id, title, description, priority, position, board_id, column_id,
@@ -93,8 +103,9 @@ export async function createTask(userId: string, data: CreateTaskBody): Promise<
         throw new Error("Название задачи обязательно");
     }
 
-    await ensureBoardOwner(data.boardId, userId);
+    await ensureBoardMember(data.boardId, userId);
     await ensureColumnBelongsToBoard(data.columnId, data.boardId);
+    await ensureAssigneeIsBoardMember(data.boardId, data.assigneeId);
     await checkWipLimit(data.columnId);
 
     const positionResult = await pool.query<{ next_position: number }>(
@@ -109,9 +120,9 @@ export async function createTask(userId: string, data: CreateTaskBody): Promise<
     const result = await pool.query<TaskRow>(
         `INSERT INTO tasks (
             title, description, priority, position, board_id, column_id, assignee_id, due_date
-         )
+        )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id, title, description, priority, position, board_id, column_id,
+             RETURNING id, title, description, priority, position, board_id, column_id,
                    assignee_id, due_date, created_at, updated_at`,
         [
             title,
@@ -139,20 +150,33 @@ export async function updateTask(
         throw new Error("Название задачи обязательно");
     }
 
+    const taskResult = await pool.query<{ board_id: string }>(
+        `SELECT board_id
+         FROM tasks
+         WHERE id = $1`,
+        [taskId]
+    );
+
+    const task = taskResult.rows[0];
+
+    if (!task) {
+        throw new Error("Задача не найдена");
+    }
+
+    await ensureBoardMember(task.board_id, userId);
+    await ensureAssigneeIsBoardMember(task.board_id, data.assigneeId);
+
     const result = await pool.query<TaskRow>(
-        `UPDATE tasks t
+        `UPDATE tasks
          SET title = $1,
              description = $2,
              priority = $3,
              assignee_id = $4,
              due_date = $5,
              updated_at = NOW()
-         FROM boards b
-         WHERE t.id = $6
-           AND t.board_id = b.id
-           AND b.owner_id = $7
-         RETURNING t.id, t.title, t.description, t.priority, t.position, t.board_id, t.column_id,
-                   t.assignee_id, t.due_date, t.created_at, t.updated_at`,
+         WHERE id = $6
+         RETURNING id, title, description, priority, position, board_id, column_id,
+                   assignee_id, due_date, created_at, updated_at`,
         [
             title,
             data.description?.trim() || null,
@@ -160,17 +184,10 @@ export async function updateTask(
             data.assigneeId ?? null,
             data.dueDate ?? null,
             taskId,
-            userId,
         ]
     );
 
-    const task = result.rows[0];
-
-    if (!task) {
-        throw new Error("Задача не найдена");
-    }
-
-    return mapTask(task);
+    return mapTask(result.rows[0]);
 }
 
 export async function moveTask(
@@ -184,18 +201,28 @@ export async function moveTask(
         await client.query("BEGIN");
 
         const taskResult = await client.query<TaskRow>(
-            `SELECT t.id, t.title, t.description, t.priority, t.position, t.board_id, t.column_id,
-                    t.assignee_id, t.due_date, t.created_at, t.updated_at
-             FROM tasks t
-             JOIN boards b ON b.id = t.board_id
-             WHERE t.id = $1 AND b.owner_id = $2`,
-            [taskId, userId]
+            `SELECT id, title, description, priority, position, board_id, column_id,
+                    assignee_id, due_date, created_at, updated_at
+             FROM tasks
+             WHERE id = $1`,
+            [taskId]
         );
 
         const task = taskResult.rows[0];
 
         if (!task) {
             throw new Error("Задача не найдена");
+        }
+
+        const memberResult = await client.query(
+            `SELECT 1
+             FROM board_members
+             WHERE board_id = $1 AND user_id = $2`,
+            [task.board_id, userId]
+        );
+
+        if (memberResult.rows.length === 0) {
+            throw new Error("Доска не найдена или нет доступа");
         }
 
         await ensureColumnBelongsToBoard(data.targetColumnId, task.board_id);
@@ -222,7 +249,7 @@ export async function moveTask(
             `UPDATE tasks
              SET column_id = $1, position = $2, updated_at = NOW()
              WHERE id = $3
-             RETURNING id, title, description, priority, position, board_id, column_id,
+                 RETURNING id, title, description, priority, position, board_id, column_id,
                        assignee_id, due_date, created_at, updated_at`,
             [data.targetColumnId, data.targetPosition, taskId]
         );
@@ -239,14 +266,26 @@ export async function moveTask(
 }
 
 export async function deleteTask(userId: string, taskId: string): Promise<void> {
+    const taskResult = await pool.query<{ board_id: string }>(
+        `SELECT board_id
+         FROM tasks
+         WHERE id = $1`,
+        [taskId]
+    );
+
+    const task = taskResult.rows[0];
+
+    if (!task) {
+        throw new Error("Задача не найдена");
+    }
+
+    await ensureBoardMember(task.board_id, userId);
+
     const result = await pool.query(
-        `DELETE FROM tasks t
-         USING boards b
-         WHERE t.id = $1
-           AND t.board_id = b.id
-           AND b.owner_id = $2
-         RETURNING t.id`,
-        [taskId, userId]
+        `DELETE FROM tasks
+         WHERE id = $1
+         RETURNING id`,
+        [taskId]
     );
 
     if (result.rows.length === 0) {

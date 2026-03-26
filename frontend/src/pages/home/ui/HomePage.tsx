@@ -1,17 +1,40 @@
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import type { Board } from '@/entities/board'
 import { BoardCard, type BoardFormValues } from '@/entities/board'
 import {
     createBoard,
-    CreateBoardCard,
     deleteBoard,
     getBoards,
     updateBoard,
 } from '@/features/boards'
+import {
+    Item,
+    ItemActions,
+    ItemContent,
+    ItemTitle,
+} from '@/components/ui/item.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { Plus } from 'lucide-react'
+import {
+    Field,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { Textarea } from '@/components/ui/textarea.tsx'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog.tsx'
 
 const boardSchema = z.object({
     title: z
@@ -144,8 +167,118 @@ export const HomePage = () => {
     }
 
     return (
-        <div className="flex flex-col p-6 gap-6">
-            <h1 className="font-medium text-xl">Мои доски</h1>
+        <div className="flex flex-col px-6 py-4 gap-4">
+            <Item className="p-0">
+                <ItemContent>
+                    <ItemTitle className="text-xl">Мои доски</ItemTitle>
+                </ItemContent>
+
+                <ItemActions>
+                    <Dialog
+                        open={createOpen}
+                        onOpenChange={(nextOpen) => {
+                            setCreateOpen(nextOpen)
+
+                            if (!nextOpen) {
+                                resetCreateForm()
+                            }
+                        }}
+                    >
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus />
+                                Создать новую доску
+                            </Button>
+                        </DialogTrigger>
+
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Новая доска</DialogTitle>
+                                <DialogDescription>
+                                    Создайте доску для задач, заметок или
+                                    командной работы.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <form
+                                id="create-board-form"
+                                onSubmit={createForm.handleSubmit(handleAdd)}
+                            >
+                                <FieldGroup>
+                                    <Controller
+                                        name="title"
+                                        control={createForm.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={
+                                                    fieldState.invalid
+                                                }
+                                            >
+                                                <FieldLabel htmlFor="create-board-title">
+                                                    Название
+                                                </FieldLabel>
+                                                <Input
+                                                    {...field}
+                                                    id="create-board-title"
+                                                    placeholder="Введите название"
+                                                    aria-invalid={
+                                                        fieldState.invalid
+                                                    }
+                                                />
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[
+                                                            fieldState.error,
+                                                        ]}
+                                                    />
+                                                )}
+                                            </Field>
+                                        )}
+                                    />
+
+                                    <Controller
+                                        name="description"
+                                        control={createForm.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={
+                                                    fieldState.invalid
+                                                }
+                                            >
+                                                <FieldLabel htmlFor="create-board-description">
+                                                    Описание
+                                                </FieldLabel>
+                                                <Textarea
+                                                    {...field}
+                                                    id="create-board-description"
+                                                    placeholder="Введите описание"
+                                                    aria-invalid={
+                                                        fieldState.invalid
+                                                    }
+                                                />
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[
+                                                            fieldState.error,
+                                                        ]}
+                                                    />
+                                                )}
+                                            </Field>
+                                        )}
+                                    />
+                                </FieldGroup>
+                            </form>
+
+                            <Field>
+                                <Button type="submit" form="create-board-form">
+                                    <Plus />
+                                    Создать
+                                </Button>
+                            </Field>
+                        </DialogContent>
+                    </Dialog>
+                </ItemActions>
+            </Item>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {boards.map((board) => (
@@ -160,14 +293,6 @@ export const HomePage = () => {
                         onDelete={handleDelete}
                     />
                 ))}
-
-                <CreateBoardCard
-                    open={createOpen}
-                    onOpenChange={setCreateOpen}
-                    form={createForm}
-                    onSubmit={handleAdd}
-                    onReset={resetCreateForm}
-                />
             </div>
         </div>
     )

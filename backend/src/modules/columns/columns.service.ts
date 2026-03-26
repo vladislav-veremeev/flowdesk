@@ -6,6 +6,7 @@ import {
     ReorderColumnsBody,
     UpdateColumnBody,
 } from "./columns.types";
+import { ensureBoardMember, ensureBoardOwner } from "../boards/boards.access";
 
 function mapColumn(row: ColumnRow): Column {
     return {
@@ -18,19 +19,8 @@ function mapColumn(row: ColumnRow): Column {
     };
 }
 
-async function ensureBoardOwner(boardId: string, userId: string) {
-    const result = await pool.query(
-        "SELECT id FROM boards WHERE id = $1 AND owner_id = $2",
-        [boardId, userId]
-    );
-
-    if (result.rows.length === 0) {
-        throw new Error("Доска не найдена");
-    }
-}
-
 export async function getColumnsByBoard(userId: string, boardId: string): Promise<Column[]> {
-    await ensureBoardOwner(boardId, userId);
+    await ensureBoardMember(boardId, userId);
 
     const result = await pool.query<ColumnRow>(
         `SELECT id, title, position, wip_limit, board_id, created_at
@@ -82,24 +72,30 @@ export async function updateColumn(
         throw new Error("Название колонки обязательно");
     }
 
-    const result = await pool.query<ColumnRow>(
-        `UPDATE board_columns bc
-         SET title = $1, wip_limit = $2
-         FROM boards b
-         WHERE bc.id = $3
-           AND bc.board_id = b.id
-           AND b.owner_id = $4
-         RETURNING bc.id, bc.title, bc.position, bc.wip_limit, bc.board_id, bc.created_at`,
-        [title, data.wipLimit ?? null, columnId, userId]
+    const columnResult = await pool.query<{ board_id: string }>(
+        `SELECT board_id
+         FROM board_columns
+         WHERE id = $1`,
+        [columnId]
     );
 
-    const column = result.rows[0];
+    const column = columnResult.rows[0];
 
     if (!column) {
         throw new Error("Колонка не найдена");
     }
 
-    return mapColumn(column);
+    await ensureBoardOwner(column.board_id, userId);
+
+    const result = await pool.query<ColumnRow>(
+        `UPDATE board_columns
+         SET title = $1, wip_limit = $2
+         WHERE id = $3
+             RETURNING id, title, position, wip_limit, board_id, created_at`,
+        [title, data.wipLimit ?? null, columnId]
+    );
+
+    return mapColumn(result.rows[0]);
 }
 
 export async function reorderColumns(
@@ -133,14 +129,26 @@ export async function reorderColumns(
 }
 
 export async function deleteColumn(userId: string, columnId: string): Promise<void> {
+    const columnResult = await pool.query<{ board_id: string }>(
+        `SELECT board_id
+         FROM board_columns
+         WHERE id = $1`,
+        [columnId]
+    );
+
+    const column = columnResult.rows[0];
+
+    if (!column) {
+        throw new Error("Колонка не найдена");
+    }
+
+    await ensureBoardOwner(column.board_id, userId);
+
     const result = await pool.query(
-        `DELETE FROM board_columns bc
-         USING boards b
-         WHERE bc.id = $1
-           AND bc.board_id = b.id
-           AND b.owner_id = $2
-         RETURNING bc.id`,
-        [columnId, userId]
+        `DELETE FROM board_columns
+         WHERE id = $1
+         RETURNING id`,
+        [columnId]
     );
 
     if (result.rows.length === 0) {

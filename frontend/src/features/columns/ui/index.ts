@@ -1,1 +1,1 @@
-export * from './AddColumnCard.tsx'
+export * from './AddColumnPopover.tsx'

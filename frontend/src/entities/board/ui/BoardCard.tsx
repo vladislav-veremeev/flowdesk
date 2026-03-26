@@ -1,5 +1,5 @@
 import { Controller, type UseFormReturn } from 'react-hook-form'
-import { Pencil, Save, Trash2 } from 'lucide-react'
+import { LogOut, Pencil, Save, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Board } from '@/entities/board'
 import { Button } from '@/components/ui/button'
@@ -34,10 +34,17 @@ import { ButtonGroup } from '@/components/ui/button-group'
 import {
     Card,
     CardAction,
+    CardContent,
     CardDescription,
+    CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card.tsx'
+import { useBoardPage } from '@/pages/board'
+import { userStore } from '@/entities/user'
+import { Badge } from '@/components/ui/badge.tsx'
+import { leaveBoard } from '@/features/board-members'
+import { toast } from 'sonner'
 
 export type BoardFormValues = {
     title: string
@@ -63,22 +70,50 @@ export const BoardCard = ({
     onEdit,
     onDelete,
 }: BoardCardProps) => {
+    const { members } = useBoardPage(board.id)
+    const user = userStore((state) => state.user)
+    const isOwner = !!board && !!user && board.ownerId === user.id
+
+    const handleLeaveBoard = async () => {
+        try {
+            await leaveBoard(board.id)
+            toast.success('Вы вышли из доски')
+        } catch (error: any) {
+            toast.error(
+                error.response?.data?.message || 'Не удалось выйти из доски'
+            )
+        }
+    }
+
     return (
         <Card className="h-fit">
             <CardHeader>
                 <Link to={`/boards/${board.id}`}>
                     <CardTitle>{board.title}</CardTitle>
                 </Link>
-
-                <CardDescription
-                    className="line-clamp-2"
-                    title={board.description || 'Описание отсутствует'}
-                >
-                    {board.description || 'Описание отсутствует'}
+                <CardDescription className="flex gap-2">
+                    {members.map((member) => (
+                        <Badge
+                            key={member.userId}
+                            variant={
+                                member.role === 'owner' ? 'default' : 'outline'
+                            }
+                            className={
+                                member.role === 'member' ? 'bg-background' : ''
+                            }
+                        >
+                            {member.username}
+                        </Badge>
+                    ))}
                 </CardDescription>
+            </CardHeader>
 
-                <CardAction>
-                    <ButtonGroup>
+            {board.description && (
+                <CardContent>{board.description}</CardContent>
+            )}
+            <CardFooter>
+                {isOwner ? (
+                    <Field orientation="horizontal">
                         <Popover
                             open={editOpenBoardId === board.id}
                             onOpenChange={(open) => {
@@ -92,6 +127,7 @@ export const BoardCard = ({
                             <PopoverTrigger asChild>
                                 <Button type="button" variant="outline">
                                     <Pencil />
+                                    Редактировать
                                 </Button>
                             </PopoverTrigger>
 
@@ -198,11 +234,11 @@ export const BoardCard = ({
                                 </Field>
                             </PopoverContent>
                         </Popover>
-
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="outline" type="button">
                                     <Trash2 />
+                                    Удалить
                                 </Button>
                             </AlertDialogTrigger>
 
@@ -230,10 +266,38 @@ export const BoardCard = ({
                                     </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
-                        </AlertDialog>
-                    </ButtonGroup>
-                </CardAction>
-            </CardHeader>
+                        </AlertDialog>{' '}
+                    </Field>
+                ) : (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="outline">
+                                <LogOut />
+                                Выйти из доски
+                            </Button>
+                        </AlertDialogTrigger>
+
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    Выйти из доски?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Вы потеряете доступ к этой доске. Чтобы
+                                    вернуться, вас нужно будет пригласить снова.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleLeaveBoard}>
+                                    Выйти
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
+            </CardFooter>
         </Card>
     )
 }

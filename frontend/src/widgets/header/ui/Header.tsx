@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button.tsx'
-import { LayoutDashboard, LogOut, UserRound } from 'lucide-react'
+import { LayoutDashboard, LogOut, Mail, UserRound } from 'lucide-react'
 import { userStore } from '@/entities/user'
 import { ButtonGroup } from '@/components/ui/button-group.tsx'
 
@@ -20,11 +20,18 @@ export const Header = () => {
                 flowdesk
             </Link>
 
-            <nav className="flex items-center gap-3">
+            <nav className="flex items-center gap-4">
                 <Button variant="outline" asChild>
                     <Link to="/">
                         <LayoutDashboard />
                         Доски
+                    </Link>
+                </Button>
+
+                <Button variant="outline" asChild>
+                    <Link to="/invitations">
+                        <Mail />
+                        Приглашения
                     </Link>
                 </Button>
 

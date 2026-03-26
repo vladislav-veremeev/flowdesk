@@ -2,7 +2,7 @@ import { Controller, useForm, type UseFormReturn } from 'react-hook-form'
 import { Pencil, Trash2 } from 'lucide-react'
 import type { Column } from '@/entities/column'
 import { type Task } from '@/entities/task'
-import { TaskItem } from '@/entities/task'
+import { TaskCard } from '@/entities/task'
 import {
     Card,
     CardAction,
@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/popover'
 import { ItemGroup } from '@/components/ui/item'
 import { Badge } from '@/components/ui/badge.tsx'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import z from 'zod'
 import { ButtonGroup } from '@/components/ui/button-group.tsx'
@@ -45,13 +45,14 @@ import {
     AlertDialog,
 } from '@/components/ui/alert-dialog.tsx'
 import { AddTaskPopover } from '@/features/tasks'
-
-export type TaskFormValues = {
-    title: string
-    description?: string
-    priority: 'low' | 'medium' | 'high'
-    dueDate?: string
-}
+import {
+    SortableContext,
+    useSortable,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { cn } from '@/lib/utils.ts'
+import type { TaskFormValues } from '@/pages/board'
 
 type ColumnWithTasks = Column & {
     tasks: Task[]
@@ -82,7 +83,12 @@ type ColumnCardProps = {
         data: EditColumnFormValues
     ) => Promise<void>
     onDeleteColumn: (columnId: string) => Promise<void>
+    isOverlay?: boolean
+    canManageColumn?: boolean
 }
+
+const getColumnSortableId = (columnId: string) => `column-${columnId}`
+const getTaskSortableId = (taskId: string) => `task-${taskId}`
 
 export const ColumnCard = ({
     column,
@@ -95,6 +101,8 @@ export const ColumnCard = ({
     onEditColumn,
     onDeleteTask,
     onDeleteColumn,
+    isOverlay = false,
+    canManageColumn = true,
 }: ColumnCardProps) => {
     const [editOpen, setEditOpen] = useState(false)
 
@@ -105,6 +113,31 @@ export const ColumnCard = ({
             wipLimit: column.wipLimit?.toString() ?? '',
         },
     })
+
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        setActivatorNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({
+        id: getColumnSortableId(column.id),
+        data: {
+            type: 'column',
+            columnId: column.id,
+        },
+        disabled: isOverlay || !canManageColumn,
+    })
+
+    const style = useMemo(
+        () => ({
+            transform: CSS.Transform.toString(transform),
+            transition,
+        }),
+        [transform, transition]
+    )
 
     const tasksCount = column.tasks.length
     const wipLimit = column.wipLimit ?? null
@@ -141,189 +174,221 @@ export const ColumnCard = ({
     }
 
     return (
-        <Card className="min-w-80 h-fit">
-            <CardHeader>
-                <CardTitle className="flex gap-2 items-center">
+        <Card
+            ref={setNodeRef}
+            style={style}
+            className={cn(
+                'min-w-80 h-fit py-4 gap-4',
+                isDragging ? 'opacity-50' : '',
+                isOverlay ? 'shadow-lg' : ''
+            )}
+        >
+            <CardHeader className="px-4">
+                <CardTitle
+                    className={cn(
+                        'flex gap-2 items-center',
+                        canManageColumn && 'cursor-grab'
+                    )}
+                    ref={setActivatorNodeRef}
+                    {...attributes}
+                    {...listeners}
+                >
                     {column.title}
                     <Badge variant="outline">
                         {hasWipLimit
-                            ? `${tasksCount}/${column.wipLimit}`
-                            : `${tasksCount}`}
+                            ? `${tasksCount}/${column.wipLimit} задач`
+                            : `${tasksCount} задач`}
                     </Badge>
                 </CardTitle>
 
-                <CardAction>
-                    <ButtonGroup>
-                        <Popover
-                            open={editOpen}
-                            onOpenChange={handleEditOpenChange}
-                        >
-                            <PopoverTrigger asChild>
-                                <Button variant="outline">
-                                    <Pencil />
-                                </Button>
-                            </PopoverTrigger>
-
-                            <PopoverContent className="flex flex-col gap-4">
-                                <PopoverHeader>
-                                    <PopoverTitle>
-                                        Редактирование колонки
-                                    </PopoverTitle>
-                                    <PopoverDescription>
-                                        Обновите название колонки и лимит задач.
-                                    </PopoverDescription>
-                                </PopoverHeader>
-
-                                <form
-                                    id={`edit-column-form-${column.id}`}
-                                    onSubmit={editColumnForm.handleSubmit(
-                                        handleEditSubmit
-                                    )}
-                                >
-                                    <FieldGroup className="gap-4">
-                                        <Controller
-                                            name="title"
-                                            control={editColumnForm.control}
-                                            render={({ field, fieldState }) => (
-                                                <Field
-                                                    data-invalid={
-                                                        fieldState.invalid
-                                                    }
-                                                >
-                                                    <FieldLabel
-                                                        htmlFor={`edit-column-title-${column.id}`}
-                                                    >
-                                                        Название
-                                                    </FieldLabel>
-                                                    <Input
-                                                        {...field}
-                                                        id={`edit-column-title-${column.id}`}
-                                                        placeholder="Введите название"
-                                                        aria-invalid={
-                                                            fieldState.invalid
-                                                        }
-                                                    />
-                                                    {fieldState.invalid && (
-                                                        <FieldError
-                                                            errors={[
-                                                                fieldState.error,
-                                                            ]}
-                                                        />
-                                                    )}
-                                                </Field>
-                                            )}
-                                        />
-
-                                        <Controller
-                                            name="wipLimit"
-                                            control={editColumnForm.control}
-                                            render={({ field, fieldState }) => (
-                                                <Field
-                                                    data-invalid={
-                                                        fieldState.invalid
-                                                    }
-                                                >
-                                                    <FieldLabel
-                                                        htmlFor={`edit-column-wip-limit-${column.id}`}
-                                                    >
-                                                        Лимит задач
-                                                    </FieldLabel>
-                                                    <Input
-                                                        {...field}
-                                                        id={`edit-column-wip-limit-${column.id}`}
-                                                        type="number"
-                                                        min={tasksCount}
-                                                        placeholder="Введите лимит"
-                                                        aria-invalid={
-                                                            fieldState.invalid
-                                                        }
-                                                    />
-                                                    {fieldState.invalid && (
-                                                        <FieldError
-                                                            errors={[
-                                                                fieldState.error,
-                                                            ]}
-                                                        />
-                                                    )}
-                                                </Field>
-                                            )}
-                                        />
-                                    </FieldGroup>
-                                </form>
-
-                                <Field>
-                                    <Button
-                                        type="submit"
-                                        form={`edit-column-form-${column.id}`}
-                                    >
-                                        Сохранить
+                {canManageColumn && (
+                    <CardAction>
+                        <ButtonGroup>
+                            <Popover
+                                open={editOpen}
+                                onOpenChange={handleEditOpenChange}
+                            >
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline">
+                                        <Pencil />
                                     </Button>
-                                </Field>
-                            </PopoverContent>
-                        </Popover>
+                                </PopoverTrigger>
 
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="outline">
-                                    <Trash2 />
-                                </Button>
-                            </AlertDialogTrigger>
+                                <PopoverContent className="flex flex-col gap-4">
+                                    <PopoverHeader>
+                                        <PopoverTitle>
+                                            Редактирование колонки
+                                        </PopoverTitle>
+                                        <PopoverDescription>
+                                            Обновите название колонки и лимит
+                                            задач.
+                                        </PopoverDescription>
+                                    </PopoverHeader>
 
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                        Удалить колонку?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Колонка «{column.title}» будет удалена
-                                        вместе со всеми её задачами без
-                                        возможности восстановления.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                        Отмена
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                        variant="destructive"
-                                        onClick={() =>
-                                            onDeleteColumn(column.id)
-                                        }
+                                    <form
+                                        id={`edit-column-form-${column.id}`}
+                                        onSubmit={editColumnForm.handleSubmit(
+                                            handleEditSubmit
+                                        )}
                                     >
-                                        Удалить
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </ButtonGroup>
-                </CardAction>
+                                        <FieldGroup className="gap-4">
+                                            <Controller
+                                                name="title"
+                                                control={editColumnForm.control}
+                                                render={({
+                                                    field,
+                                                    fieldState,
+                                                }) => (
+                                                    <Field
+                                                        data-invalid={
+                                                            fieldState.invalid
+                                                        }
+                                                    >
+                                                        <FieldLabel
+                                                            htmlFor={`edit-column-title-${column.id}`}
+                                                        >
+                                                            Название
+                                                        </FieldLabel>
+                                                        <Input
+                                                            {...field}
+                                                            id={`edit-column-title-${column.id}`}
+                                                            placeholder="Введите название"
+                                                            aria-invalid={
+                                                                fieldState.invalid
+                                                            }
+                                                        />
+                                                        {fieldState.invalid && (
+                                                            <FieldError
+                                                                errors={[
+                                                                    fieldState.error,
+                                                                ]}
+                                                            />
+                                                        )}
+                                                    </Field>
+                                                )}
+                                            />
+
+                                            <Controller
+                                                name="wipLimit"
+                                                control={editColumnForm.control}
+                                                render={({
+                                                    field,
+                                                    fieldState,
+                                                }) => (
+                                                    <Field
+                                                        data-invalid={
+                                                            fieldState.invalid
+                                                        }
+                                                    >
+                                                        <FieldLabel
+                                                            htmlFor={`edit-column-wip-limit-${column.id}`}
+                                                        >
+                                                            Лимит задач
+                                                        </FieldLabel>
+                                                        <Input
+                                                            {...field}
+                                                            id={`edit-column-wip-limit-${column.id}`}
+                                                            type="number"
+                                                            min={tasksCount}
+                                                            placeholder="Введите лимит"
+                                                            aria-invalid={
+                                                                fieldState.invalid
+                                                            }
+                                                        />
+                                                        {fieldState.invalid && (
+                                                            <FieldError
+                                                                errors={[
+                                                                    fieldState.error,
+                                                                ]}
+                                                            />
+                                                        )}
+                                                    </Field>
+                                                )}
+                                            />
+                                        </FieldGroup>
+                                    </form>
+
+                                    <Field>
+                                        <Button
+                                            type="submit"
+                                            form={`edit-column-form-${column.id}`}
+                                        >
+                                            Сохранить
+                                        </Button>
+                                    </Field>
+                                </PopoverContent>
+                            </Popover>
+
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="outline">
+                                        <Trash2 />
+                                    </Button>
+                                </AlertDialogTrigger>
+
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                            Удалить колонку?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Колонка «{column.title}» будет
+                                            удалена вместе со всеми её задачами
+                                            без возможности восстановления.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>
+                                            Отмена
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                            variant="destructive"
+                                            onClick={() =>
+                                                onDeleteColumn(column.id)
+                                            }
+                                        >
+                                            Удалить
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </ButtonGroup>
+                    </CardAction>
+                )}
             </CardHeader>
 
-            <CardContent>
-                {column.tasks.length > 0 ? (
-                    <ItemGroup className="gap-6">
-                        {column.tasks.map((task) => (
-                            <TaskItem
-                                key={task.id}
-                                task={task}
-                                onEdit={onEditTask}
-                                onDelete={onDeleteTask}
-                            />
-                        ))}
-                    </ItemGroup>
-                ) : (
-                    <p className="text-sm text-muted-foreground">
-                        В колонке пока нет задач
-                    </p>
-                )}
+            <CardContent className="px-4">
+                <SortableContext
+                    items={column.tasks.map((task) =>
+                        getTaskSortableId(task.id)
+                    )}
+                    strategy={verticalListSortingStrategy}
+                >
+                    {column.tasks.length > 0 ? (
+                        <ItemGroup className="gap-4">
+                            {column.tasks.map((task) => (
+                                <TaskCard
+                                    key={task.id}
+                                    task={task}
+                                    onEdit={onEditTask}
+                                    onDelete={onDeleteTask}
+                                />
+                            ))}
+                        </ItemGroup>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            В колонке пока нет задач
+                        </p>
+                    )}
+                </SortableContext>
             </CardContent>
 
-            <CardFooter>
+            <CardFooter className="px-4">
                 <AddTaskPopover
                     columnId={column.id}
                     open={addTaskOpenColumnId === column.id}
-                    disabled={Boolean(isWipLimitReached)}
+                    disabled={Boolean(isWipLimitReached) || isOverlay}
                     form={taskForm}
                     onOpenChange={(open) => {
                         if (open) {

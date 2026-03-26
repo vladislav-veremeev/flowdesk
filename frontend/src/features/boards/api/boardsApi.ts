@@ -25,3 +25,8 @@ export const deleteBoard = async (boardId: string) => {
     const response = await api.delete<{ message: string }>(`/boards/${boardId}`)
     return response.data
 }
+
+export const getBoardById = async (boardId: string) => {
+    const response = await api.get(`/boards/${boardId}`)
+    return response.data
+}

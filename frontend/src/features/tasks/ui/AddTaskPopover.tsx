@@ -1,6 +1,5 @@
 import { Controller, type UseFormReturn } from 'react-hook-form'
 import { Plus } from 'lucide-react'
-import { taskPriorityLabels } from '@/entities/task'
 import { Button } from '@/components/ui/button'
 import {
     Field,
@@ -148,13 +147,13 @@ export const AddTaskPopover = ({
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="low">
-                                                {taskPriorityLabels.low}
+                                                Низкий
                                             </SelectItem>
                                             <SelectItem value="medium">
-                                                {taskPriorityLabels.medium}
+                                                Средний
                                             </SelectItem>
                                             <SelectItem value="high">
-                                                {taskPriorityLabels.high}
+                                                Высокий
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>

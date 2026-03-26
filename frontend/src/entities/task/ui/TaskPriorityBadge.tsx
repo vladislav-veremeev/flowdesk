@@ -1,4 +1,4 @@
-import { type TaskPriority, taskPriorityLabels } from '@/entities/task'
+import { type TaskPriority } from '@/entities/task'
 import { Badge } from '@/components/ui/badge.tsx'
 
 type TaskPriorityBadgeProps = {
@@ -10,6 +10,12 @@ export const TaskPriorityBadge = ({ priority }: TaskPriorityBadgeProps) => {
         low: 'bg-green-50 text-green-700',
         medium: 'bg-blue-50 text-blue-700',
         high: 'bg-red-50 text-red-700',
+    }
+
+    const taskPriorityLabels: Record<TaskPriority, string> = {
+        low: 'Низкий',
+        medium: 'Средний',
+        high: 'Высокий',
     }
 
     return (

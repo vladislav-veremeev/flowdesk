@@ -1,2 +1,2 @@
-export * from './TaskItem.tsx'
+export * from './TaskCard.tsx'
 export * from './TaskPriorityBadge.tsx'

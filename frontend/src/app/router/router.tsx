@@ -7,6 +7,7 @@ import { AppLayout } from './layouts'
 import { ProfilePage } from '@/pages/profile'
 import { HomePage } from '@/pages/home'
 import { BoardPage } from '@/pages/board'
+import { InvitationsPage } from '@/pages/invitations'
 
 export const router = createBrowserRouter([
     {
@@ -39,6 +40,10 @@ export const router = createBrowserRouter([
             {
                 path: '/boards/:id',
                 element: <BoardPage />,
+            },
+            {
+                path: '/invitations',
+                element: <InvitationsPage />,
             },
             {
                 path: '/profile',

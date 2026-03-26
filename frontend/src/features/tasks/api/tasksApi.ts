@@ -36,6 +36,17 @@ export const updateTask = async (
     return response.data
 }
 
+export const moveTask = async (
+    taskId: string,
+    payload: {
+        targetColumnId: string
+        targetPosition: number
+    }
+) => {
+    const response = await api.patch<Task>(`/tasks/${taskId}/move`, payload)
+    return response.data
+}
+
 export const deleteTask = async (taskId: string) => {
     const response = await api.delete<{ message: string }>(`/tasks/${taskId}`)
     return response.data
