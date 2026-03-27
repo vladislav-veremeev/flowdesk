@@ -13,34 +13,24 @@ function validateUsername(username: string): boolean {
     return username.trim().length >= 3;
 }
 
-function validateEmail(email: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
 function validatePassword(password: string): boolean {
     return password.length >= 6;
 }
 
-function toSafeUser(user: Pick<UserRow, "id" | "username" | "email" | "created_at">): SafeUser {
+function toSafeUser(user: Pick<UserRow, "id" | "username" | "created_at">): SafeUser {
     return {
         id: user.id,
         username: user.username,
-        email: user.email,
         createdAt: user.created_at,
     };
 }
 
 export async function registerUser(data: RegisterBody) {
     const username = data.username.trim();
-    const email = data.email.trim().toLowerCase();
     const password = data.password;
 
     if (!validateUsername(username)) {
         throw new Error("Username должен быть не короче 3 символов");
-    }
-
-    if (!validateEmail(email)) {
-        throw new Error("Некорректный email");
     }
 
     if (!validatePassword(password)) {
@@ -48,7 +38,7 @@ export async function registerUser(data: RegisterBody) {
     }
 
     const existingByUsername = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash, created_at FROM users WHERE username = $1",
+        "SELECT id, username, password_hash, created_at FROM users WHERE username = $1",
         [username]
     );
 
@@ -56,24 +46,15 @@ export async function registerUser(data: RegisterBody) {
         throw new Error("Пользователь с таким username уже существует");
     }
 
-    const existingByEmail = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash, created_at FROM users WHERE email = $1",
-        [email]
-    );
-
-    if (existingByEmail.rows.length > 0) {
-        throw new Error("Пользователь с таким email уже существует");
-    }
-
     const passwordHash = await bcrypt.hash(password, 10);
 
     const createdUserResult = await pool.query<UserRow>(
         `
-            INSERT INTO users (username, email, password_hash)
-            VALUES ($1, $2, $3)
-            RETURNING id, username, email, password_hash, created_at
+            INSERT INTO users (username, password_hash)
+            VALUES ($1, $2)
+            RETURNING id, username, password_hash, created_at
         `,
-        [username, email, passwordHash]
+        [username, passwordHash]
     );
 
     const user = createdUserResult.rows[0];
@@ -81,7 +62,6 @@ export async function registerUser(data: RegisterBody) {
     const token = signAccessToken({
         id: user.id,
         username: user.username,
-        email: user.email,
     });
 
     return {
@@ -91,30 +71,29 @@ export async function registerUser(data: RegisterBody) {
 }
 
 export async function loginUser(data: LoginBody) {
-    const email = data.email.trim().toLowerCase();
+    const username = data.username.trim();
     const password = data.password;
 
     const userResult = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash, created_at FROM users WHERE email = $1",
-        [email]
+        "SELECT id, username, password_hash, created_at FROM users WHERE username = $1",
+        [username]
     );
 
     const user = userResult.rows[0];
 
     if (!user) {
-        throw new Error("Неверный email или пароль");
+        throw new Error("Неверный username или пароль");
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
     if (!isPasswordValid) {
-        throw new Error("Неверный email или пароль");
+        throw new Error("Неверный username или пароль");
     }
 
     const token = signAccessToken({
         id: user.id,
         username: user.username,
-        email: user.email,
     });
 
     return {
@@ -125,7 +104,7 @@ export async function loginUser(data: LoginBody) {
 
 export async function getCurrentUser(userId: string): Promise<SafeUser | null> {
     const result = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash, created_at FROM users WHERE id = $1",
+        "SELECT id, username, password_hash, created_at FROM users WHERE id = $1",
         [userId]
     );
 
@@ -139,7 +118,6 @@ export async function updateCurrentUser(
     data: UpdateProfileBody
 ): Promise<SafeUser> {
     const username = data.username.trim();
-    const email = data.email.trim().toLowerCase();
     const currentPassword = data.currentPassword?.trim();
     const newPassword = data.newPassword?.trim();
 
@@ -147,12 +125,8 @@ export async function updateCurrentUser(
         throw new Error("Username должен быть не короче 3 символов");
     }
 
-    if (!validateEmail(email)) {
-        throw new Error("Некорректный email");
-    }
-
     const currentUserResult = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash, created_at FROM users WHERE id = $1",
+        "SELECT id, username, password_hash, created_at FROM users WHERE id = $1",
         [userId]
     );
 
@@ -163,21 +137,12 @@ export async function updateCurrentUser(
     }
 
     const existingByUsername = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash, created_at FROM users WHERE username = $1 AND id <> $2",
+        "SELECT id, username, password_hash, created_at FROM users WHERE username = $1 AND id <> $2",
         [username, userId]
     );
 
     if (existingByUsername.rows.length > 0) {
         throw new Error("Пользователь с таким username уже существует");
-    }
-
-    const existingByEmail = await pool.query<UserRow>(
-        "SELECT id, username, email, password_hash, created_at FROM users WHERE email = $1 AND id <> $2",
-        [email, userId]
-    );
-
-    if (existingByEmail.rows.length > 0) {
-        throw new Error("Пользователь с таким email уже существует");
     }
 
     let passwordHash = currentUser.password_hash;
@@ -206,11 +171,11 @@ export async function updateCurrentUser(
     const updatedUserResult = await pool.query<UserRow>(
         `
             UPDATE users
-            SET username = $1, email = $2, password_hash = $3
-            WHERE id = $4
-            RETURNING id, username, email, password_hash, created_at
+            SET username = $1, password_hash = $2
+            WHERE id = $3
+            RETURNING id, username, password_hash, created_at
         `,
-        [username, email, passwordHash, userId]
+        [username, passwordHash, userId]
     );
 
     const updatedUser = updatedUserResult.rows[0];

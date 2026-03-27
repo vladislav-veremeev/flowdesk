@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, User } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
 import { type Task, TaskPriorityBadge } from '@/entities/task'
+import type { BoardMember } from '@/entities/board-member'
 import { formatDateTime, toDateTimeLocalValue } from '@/shared/lib'
 
 import { ButtonGroup } from '@/components/ui/button-group.tsx'
@@ -65,12 +66,14 @@ const editTaskSchema = z.object({
     description: z.string().max(5000, 'Описание слишком длинное').optional(),
     priority: z.enum(['low', 'medium', 'high']),
     dueDate: z.string().optional(),
+    assigneeId: z.string().optional(),
 })
 
 type EditTaskFormValues = z.infer<typeof editTaskSchema>
 
 type TaskCardProps = {
     task: Task
+    members: BoardMember[]
     onEdit: (taskId: string, data: EditTaskFormValues) => Promise<void>
     onDelete: (taskId: string) => Promise<void>
     isOverlay?: boolean
@@ -80,11 +83,14 @@ const getTaskSortableId = (taskId: string) => `task-${taskId}`
 
 export const TaskCard = ({
     task,
+    members,
     onEdit,
     onDelete,
     isOverlay = false,
 }: TaskCardProps) => {
     const [editOpen, setEditOpen] = useState(false)
+
+    const assignee = members.find((member) => member.userId === task.assigneeId)
 
     const editForm = useForm<EditTaskFormValues>({
         resolver: zodResolver(editTaskSchema),
@@ -93,6 +99,7 @@ export const TaskCard = ({
             description: task.description ?? '',
             priority: task.priority,
             dueDate: toDateTimeLocalValue(task.dueDate),
+            assigneeId: task.assigneeId ?? undefined,
         },
     })
 
@@ -131,6 +138,7 @@ export const TaskCard = ({
                 description: task.description ?? '',
                 priority: task.priority,
                 dueDate: toDateTimeLocalValue(task.dueDate),
+                assigneeId: task.assigneeId ?? undefined,
             })
         }
     }
@@ -139,6 +147,8 @@ export const TaskCard = ({
         await onEdit(task.id, data)
         setEditOpen(false)
     }
+
+    const now = toDateTimeLocalValue(new Date().toISOString())
 
     return (
         <Card
@@ -158,16 +168,23 @@ export const TaskCard = ({
                     {...listeners}
                 >
                     {task.title}
-                    <TaskPriorityBadge priority={task.priority} />
                 </CardTitle>
 
-                {task.dueDate && (
-                    <CardDescription>
+                <CardDescription className="flex flex-wrap gap-2">
+                    <TaskPriorityBadge priority={task.priority} />
+                    {task.dueDate && (
                         <Badge variant="outline">
                             До {formatDateTime(task.dueDate)}
                         </Badge>
-                    </CardDescription>
-                )}
+                    )}
+
+                    {assignee && (
+                        <Badge variant="outline" className="gap-1">
+                            <User className="size-3" />
+                            {assignee.username}
+                        </Badge>
+                    )}
+                </CardDescription>
 
                 <CardAction>
                     <ButtonGroup>
@@ -187,8 +204,8 @@ export const TaskCard = ({
                                         Редактирование задачи
                                     </PopoverTitle>
                                     <PopoverDescription>
-                                        Обновите название, описание, приоритет и
-                                        срок.
+                                        Обновите название, описание, приоритет,
+                                        исполнителя и срок.
                                     </PopoverDescription>
                                 </PopoverHeader>
 
@@ -248,6 +265,9 @@ export const TaskCard = ({
                                                     </FieldLabel>
                                                     <Textarea
                                                         {...field}
+                                                        value={
+                                                            field.value ?? ''
+                                                        }
                                                         id={`edit-task-description-${task.id}`}
                                                         placeholder="Введите описание"
                                                         aria-invalid={
@@ -318,6 +338,78 @@ export const TaskCard = ({
                                         />
 
                                         <Controller
+                                            name="assigneeId"
+                                            control={editForm.control}
+                                            render={({ field, fieldState }) => (
+                                                <Field
+                                                    data-invalid={
+                                                        fieldState.invalid
+                                                    }
+                                                >
+                                                    <FieldLabel
+                                                        htmlFor={`edit-task-assignee-${task.id}`}
+                                                    >
+                                                        Исполнитель
+                                                    </FieldLabel>
+                                                    <Select
+                                                        name={field.name}
+                                                        value={
+                                                            field.value ??
+                                                            'unassigned'
+                                                        }
+                                                        onValueChange={(
+                                                            value
+                                                        ) =>
+                                                            field.onChange(
+                                                                value ===
+                                                                    'unassigned'
+                                                                    ? undefined
+                                                                    : value
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger
+                                                            id={`edit-task-assignee-${task.id}`}
+                                                            aria-invalid={
+                                                                fieldState.invalid
+                                                            }
+                                                        >
+                                                            <SelectValue placeholder="Выберите исполнителя" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="unassigned">
+                                                                Не назначен
+                                                            </SelectItem>
+                                                            {members.map(
+                                                                (member) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            member.userId
+                                                                        }
+                                                                        value={
+                                                                            member.userId
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            member.username
+                                                                        }
+                                                                    </SelectItem>
+                                                                )
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {fieldState.invalid && (
+                                                        <FieldError
+                                                            errors={[
+                                                                fieldState.error,
+                                                            ]}
+                                                        />
+                                                    )}
+                                                </Field>
+                                            )}
+                                        />
+
+                                        <Controller
                                             name="dueDate"
                                             control={editForm.control}
                                             render={({ field, fieldState }) => (
@@ -333,8 +425,12 @@ export const TaskCard = ({
                                                     </FieldLabel>
                                                     <Input
                                                         {...field}
+                                                        value={
+                                                            field.value ?? ''
+                                                        }
                                                         id={`edit-task-due-date-${task.id}`}
                                                         type="datetime-local"
+                                                        min={now}
                                                         aria-invalid={
                                                             fieldState.invalid
                                                         }

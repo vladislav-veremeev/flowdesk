@@ -18,6 +18,9 @@ import {
 } from '@/features/columns'
 import { createTask, deleteTask, getTasks, updateTask } from '@/features/tasks'
 
+
+import { createBoardInvitation } from '@/features/board-invitations'
+
 const columnSchema = z.object({
     title: z
         .string()
@@ -36,10 +39,20 @@ const taskSchema = z.object({
     description: z.string().max(5000, 'Описание слишком длинное').optional(),
     priority: z.enum(['low', 'medium', 'high']),
     dueDate: z.string().optional(),
+    assigneeId: z.string().optional(),
+})
+
+const inviteSchema = z.object({
+    username: z
+        .string()
+        .trim()
+        .min(1, 'Введите имя пользователя')
+        .min(3, 'Имя пользователя должно содержать минимум 3 символа'),
 })
 
 export type ColumnFormValues = z.infer<typeof columnSchema>
 export type TaskFormValues = z.infer<typeof taskSchema>
+export type InviteFormValues = z.infer<typeof inviteSchema>
 
 const columnDefaultValues: ColumnFormValues = {
     title: '',
@@ -51,6 +64,11 @@ const taskDefaultValues: TaskFormValues = {
     description: '',
     priority: 'medium',
     dueDate: '',
+    assigneeId: undefined,
+}
+
+const inviteDefaultValues: InviteFormValues = {
+    username: '',
 }
 
 export const useBoardPage = (boardId?: string) => {
@@ -59,9 +77,12 @@ export const useBoardPage = (boardId?: string) => {
     const [columns, setColumns] = useState<Column[]>([])
     const [tasks, setTasks] = useState<Task[]>([])
     const [addColumnOpen, setAddColumnOpen] = useState(false)
+    const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
     const [addTaskOpenColumnId, setAddTaskOpenColumnId] = useState<
         string | null
     >(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [loadError, setLoadError] = useState<string | null>(null)
 
     const columnForm = useForm<ColumnFormValues>({
         resolver: zodResolver(columnSchema),
@@ -73,13 +94,23 @@ export const useBoardPage = (boardId?: string) => {
         defaultValues: taskDefaultValues,
     })
 
+    const inviteForm = useForm<InviteFormValues>({
+        resolver: zodResolver(inviteSchema),
+        defaultValues: inviteDefaultValues,
+    })
+
     useEffect(() => {
         const loadBoardPage = async () => {
             if (!boardId) {
+                setIsLoading(false)
+                setLoadError('Доска не найдена')
                 return
             }
 
             try {
+                setIsLoading(true)
+                setLoadError(null)
+
                 const [boardData, membersData, columnsData, tasksData] =
                     await Promise.all([
                         getBoardById(boardId),
@@ -93,10 +124,17 @@ export const useBoardPage = (boardId?: string) => {
                 setColumns(columnsData)
                 setTasks(tasksData)
             } catch (error: any) {
-                toast.error(
+                setBoard(null)
+                setMembers([])
+                setColumns([])
+                setTasks([])
+
+                setLoadError(
                     error.response?.data?.message ||
                         'Не удалось загрузить доску'
                 )
+            } finally {
+                setIsLoading(false)
             }
         }
 
@@ -110,6 +148,10 @@ export const useBoardPage = (boardId?: string) => {
     const resetTaskForm = () => {
         taskForm.reset(taskDefaultValues)
         setAddTaskOpenColumnId(null)
+    }
+
+    const resetInviteForm = () => {
+        inviteForm.reset(inviteDefaultValues)
     }
 
     const handleAddColumn = async (data: ColumnFormValues) => {
@@ -215,6 +257,7 @@ export const useBoardPage = (boardId?: string) => {
                 dueDate: data.dueDate
                     ? new Date(data.dueDate).toISOString()
                     : null,
+                assigneeId: data.assigneeId || null,
             })
 
             setTasks((current) => [...current, newTask])
@@ -237,6 +280,7 @@ export const useBoardPage = (boardId?: string) => {
                 dueDate: data.dueDate
                     ? new Date(data.dueDate).toISOString()
                     : null,
+                assigneeId: data.assigneeId || null,
             })
 
             setTasks((current) =>
@@ -265,6 +309,26 @@ export const useBoardPage = (boardId?: string) => {
         }
     }
 
+    const handleInviteMember = async (data: InviteFormValues) => {
+        if (!boardId) return
+
+        try {
+            await createBoardInvitation({
+                boardId: boardId,
+                inviteeUsername: data.username,
+            })
+
+            toast.success('Приглашение успешно отправлено')
+            resetInviteForm()
+            setInviteDialogOpen(false)
+        } catch (error: any) {
+            toast.error(
+                error.response?.data?.message ||
+                    'Не удалось отправить приглашение'
+            )
+        }
+    }
+
     return {
         board,
         members,
@@ -274,17 +338,24 @@ export const useBoardPage = (boardId?: string) => {
         setTasks,
         addColumnOpen,
         setAddColumnOpen,
+        setInviteDialogOpen,
+        inviteDialogOpen,
         addTaskOpenColumnId,
         columnForm,
         taskForm,
+        inviteForm,
         resetColumnForm,
         resetTaskForm,
+        resetInviteForm,
         handleOpenAddTask,
         handleAddColumn,
         handleEditColumn,
         handleDeleteColumn,
+        handleInviteMember,
         handleAddTask,
         handleEditTask,
         handleDeleteTask,
+        isLoading,
+        loadError,
     }
 }

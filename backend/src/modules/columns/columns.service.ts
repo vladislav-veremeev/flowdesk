@@ -129,29 +129,50 @@ export async function reorderColumns(
 }
 
 export async function deleteColumn(userId: string, columnId: string): Promise<void> {
-    const columnResult = await pool.query<{ board_id: string }>(
-        `SELECT board_id
-         FROM board_columns
-         WHERE id = $1`,
-        [columnId]
-    );
+    const client = await pool.connect();
 
-    const column = columnResult.rows[0];
+    try {
+        await client.query("BEGIN");
 
-    if (!column) {
-        throw new Error("Колонка не найдена");
-    }
+        const columnResult = await client.query<{ board_id: string; position: number }>(
+            `SELECT board_id, position
+             FROM board_columns
+             WHERE id = $1`,
+            [columnId]
+        );
 
-    await ensureBoardOwner(column.board_id, userId);
+        const column = columnResult.rows[0];
 
-    const result = await pool.query(
-        `DELETE FROM board_columns
-         WHERE id = $1
-         RETURNING id`,
-        [columnId]
-    );
+        if (!column) {
+            throw new Error("Колонка не найдена");
+        }
 
-    if (result.rows.length === 0) {
-        throw new Error("Колонка не найдена");
+        await ensureBoardOwner(column.board_id, userId);
+
+        const deleteResult = await client.query(
+            `DELETE FROM board_columns
+             WHERE id = $1
+             RETURNING id`,
+            [columnId]
+        );
+
+        if (deleteResult.rows.length === 0) {
+            throw new Error("Колонка не найдена");
+        }
+
+        await client.query(
+            `UPDATE board_columns
+             SET position = position - 1
+             WHERE board_id = $1
+               AND position > $2`,
+            [column.board_id, column.position]
+        );
+
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
     }
 }

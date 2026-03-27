@@ -12,7 +12,7 @@ export type BoardInvitationRow = {
 
 export type CreateBoardInvitationBody = {
     boardId: string;
-    inviteeEmail: string;
+    inviteeUsername: string;
 };
 
 export type BoardInvitation = {
@@ -35,7 +35,6 @@ export type IncomingBoardInvitationRow = {
     responded_at: string | null;
     board_title: string;
     inviter_username: string;
-    inviter_email: string;
 };
 
 export type IncomingBoardInvitation = {
@@ -44,7 +43,6 @@ export type IncomingBoardInvitation = {
     boardTitle: string;
     inviterId: string;
     inviterUsername: string;
-    inviterEmail: string;
     inviteeId: string;
     status: InvitationStatus;
     createdAt: string;

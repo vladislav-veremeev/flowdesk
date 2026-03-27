@@ -53,12 +53,6 @@ const profileSchema = z
             .trim()
             .min(1, 'Введите имя пользователя')
             .min(3, 'Имя пользователя должно содержать минимум 3 символа'),
-
-        email: z
-            .string()
-            .trim()
-            .min(1, 'Введите email')
-            .email('Некорректный email'),
         currentPassword: z.string().optional(),
         newPassword: z.string().optional(),
     })
@@ -104,7 +98,6 @@ export const ProfilePage = () => {
         resolver: zodResolver(profileSchema),
         defaultValues: {
             username: '',
-            email: '',
             currentPassword: '',
             newPassword: '',
         },
@@ -113,7 +106,6 @@ export const ProfilePage = () => {
     const resetEditForm = () => {
         form.reset({
             username: user?.username ?? '',
-            email: user?.email ?? '',
             currentPassword: '',
             newPassword: '',
         })
@@ -123,7 +115,6 @@ export const ProfilePage = () => {
         try {
             const payload = {
                 username: data.username,
-                email: data.email,
                 currentPassword: data.currentPassword || undefined,
                 newPassword: data.newPassword || undefined,
             }
@@ -133,7 +124,6 @@ export const ProfilePage = () => {
 
             form.reset({
                 username: updatedUser.username,
-                email: updatedUser.email,
                 currentPassword: '',
                 newPassword: '',
             })
@@ -180,11 +170,6 @@ export const ProfilePage = () => {
                         </Field>
 
                         <Field>
-                            <FieldLabel>Email</FieldLabel>
-                            <p className="text-sm">{user?.email}</p>
-                        </Field>
-
-                        <Field>
                             <FieldLabel>Дата регистрации</FieldLabel>
                             <p className="text-sm">
                                 {formatDateTime(user?.createdAt)}
@@ -217,8 +202,7 @@ export const ProfilePage = () => {
                                         Редактирование профиля
                                     </DialogTitle>
                                     <DialogDescription>
-                                        Измените имя пользователя, почту или
-                                        пароль.
+                                        Измените имя пользователя или пароль.
                                     </DialogDescription>
                                 </DialogHeader>
 
@@ -243,38 +227,6 @@ export const ProfilePage = () => {
                                                         {...field}
                                                         id="username"
                                                         placeholder="Введите имя пользователя"
-                                                        aria-invalid={
-                                                            fieldState.invalid
-                                                        }
-                                                    />
-                                                    {fieldState.invalid && (
-                                                        <FieldError
-                                                            errors={[
-                                                                fieldState.error,
-                                                            ]}
-                                                        />
-                                                    )}
-                                                </Field>
-                                            )}
-                                        />
-
-                                        <Controller
-                                            name="email"
-                                            control={form.control}
-                                            render={({ field, fieldState }) => (
-                                                <Field
-                                                    data-invalid={
-                                                        fieldState.invalid
-                                                    }
-                                                >
-                                                    <FieldLabel htmlFor="email">
-                                                        Email
-                                                    </FieldLabel>
-                                                    <Input
-                                                        {...field}
-                                                        id="email"
-                                                        type="email"
-                                                        placeholder="Введите email"
                                                         aria-invalid={
                                                             fieldState.invalid
                                                         }

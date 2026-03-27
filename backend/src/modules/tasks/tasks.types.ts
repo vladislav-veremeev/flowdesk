@@ -8,8 +8,8 @@ export type TaskRow = {
     position: number;
     board_id: string;
     column_id: string;
-    assignee_id: string | null;
     due_date: string | null;
+    assignee_id: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -20,16 +20,16 @@ export type CreateTaskBody = {
     priority?: TaskPriority;
     boardId: string;
     columnId: string;
-    assigneeId?: string | null;
     dueDate?: string | null;
+    assigneeId?: string | null;
 };
 
 export type UpdateTaskBody = {
     title: string;
     description?: string;
     priority?: TaskPriority;
-    assigneeId?: string | null;
     dueDate?: string | null;
+    assigneeId?: string | null;
 };
 
 export type MoveTaskBody = {
@@ -45,8 +45,8 @@ export type Task = {
     position: number;
     boardId: string;
     columnId: string;
-    assigneeId: string | null;
     dueDate: string | null;
+    assigneeId: string | null;
     createdAt: string;
     updatedAt: string;
 };

@@ -7,19 +7,17 @@ type AuthResponse = {
 }
 
 type LoginPayload = {
-    email: string
+    username: string
     password: string
 }
 
 type RegisterPayload = {
     username: string
-    email: string
     password: string
 }
 
 type UpdateMePayload = {
     username: string
-    email: string
     currentPassword?: string
     newPassword?: string
 }

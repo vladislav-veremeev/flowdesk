@@ -42,7 +42,6 @@ function mapBoardMember(row: BoardMemberRow): BoardMember {
     return {
         userId: row.user_id,
         username: row.username,
-        email: row.email,
         role: row.role,
         joinedAt: row.joined_at,
     };
@@ -58,7 +57,7 @@ export async function leaveBoard(userId: string, boardId: string): Promise<void>
     const result = await pool.query(
         `DELETE FROM board_members
          WHERE board_id = $1 AND user_id = $2
-         RETURNING user_id`,
+             RETURNING user_id`,
         [boardId, userId]
     );
 
@@ -85,7 +84,7 @@ export async function getBoardsByUser(userId: string): Promise<Board[]> {
     const result = await pool.query<BoardRow>(
         `SELECT DISTINCT b.id, b.title, b.description, b.owner_id, b.created_at
          FROM boards b
-         JOIN board_members bm ON bm.board_id = b.id
+                  JOIN board_members bm ON bm.board_id = b.id
          WHERE bm.user_id = $1
          ORDER BY b.created_at DESC`,
         [userId]
@@ -110,7 +109,7 @@ export async function createBoard(userId: string, data: CreateBoardBody): Promis
         const result = await client.query<BoardRow>(
             `INSERT INTO boards (title, description, owner_id)
              VALUES ($1, $2, $3)
-             RETURNING id, title, description, owner_id, created_at`,
+                 RETURNING id, title, description, owner_id, created_at`,
             [title, description, userId]
         );
 
@@ -119,7 +118,7 @@ export async function createBoard(userId: string, data: CreateBoardBody): Promis
         await client.query(
             `INSERT INTO board_members (board_id, user_id, role)
              VALUES ($1, $2, 'owner')
-             ON CONFLICT (board_id, user_id) DO NOTHING`,
+                 ON CONFLICT (board_id, user_id) DO NOTHING`,
             [board.id, userId]
         );
 
@@ -152,7 +151,7 @@ export async function updateBoard(
         `UPDATE boards
          SET title = $1, description = $2
          WHERE id = $3
-         RETURNING id, title, description, owner_id, created_at`,
+             RETURNING id, title, description, owner_id, created_at`,
         [title, description, boardId]
     );
 
@@ -171,7 +170,7 @@ export async function deleteBoard(userId: string, boardId: string): Promise<void
     const result = await pool.query(
         `DELETE FROM boards
          WHERE id = $1
-         RETURNING id`,
+             RETURNING id`,
         [boardId]
     );
 
@@ -188,17 +187,16 @@ export async function getBoardMembers(
 
     const result = await pool.query<BoardMemberRow>(
         `SELECT
-            u.id AS user_id,
-            u.username,
-            u.email,
-            bm.role,
-            bm.created_at AS joined_at
+             u.id AS user_id,
+             u.username,
+             bm.role,
+             bm.created_at AS joined_at
          FROM board_members bm
-         JOIN users u ON u.id = bm.user_id
+                  JOIN users u ON u.id = bm.user_id
          WHERE bm.board_id = $1
          ORDER BY
-            CASE WHEN bm.role = 'owner' THEN 0 ELSE 1 END,
-            bm.created_at ASC`,
+             CASE WHEN bm.role = 'owner' THEN 0 ELSE 1 END,
+             bm.created_at ASC`,
         [boardId]
     );
 
@@ -232,7 +230,7 @@ export async function removeBoardMember(
     const result = await pool.query(
         `DELETE FROM board_members
          WHERE board_id = $1 AND user_id = $2
-         RETURNING user_id`,
+             RETURNING user_id`,
         [boardId, memberUserId]
     );
 

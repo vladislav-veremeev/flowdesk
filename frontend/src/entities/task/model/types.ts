@@ -8,8 +8,8 @@ export interface Task {
     position: number
     boardId: string
     columnId: string
-    assigneeId: string | null
     dueDate: string | null
+    assigneeId: string | null
     createdAt: string
     updatedAt: string
 }

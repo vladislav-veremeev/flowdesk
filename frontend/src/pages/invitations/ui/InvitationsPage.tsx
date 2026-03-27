@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Mail, Trash2, X } from 'lucide-react'
+import { Check, ExternalLink, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import type { IncomingInvitation } from '@/entities/invitation'
@@ -168,7 +168,7 @@ export const InvitationsPage = () => {
 
                             return (
                                 <Card key={invitation.id}>
-                                    <CardHeader className="flex">
+                                    <CardHeader>
                                         <CardTitle>
                                             {invitation.boardTitle}
                                         </CardTitle>
@@ -191,8 +191,7 @@ export const InvitationsPage = () => {
                                             <span className="font-medium">
                                                 Пригласил:
                                             </span>{' '}
-                                            {invitation.inviterUsername} (
-                                            {invitation.inviterEmail})
+                                            {invitation.inviterUsername}
                                         </p>
 
                                         <p>
@@ -218,9 +217,10 @@ export const InvitationsPage = () => {
 
                                     <CardFooter>
                                         <Field orientation="horizontal">
-                                            {isPending && (
+                                            {isPending ? (
                                                 <>
                                                     <Button
+                                                        type="button"
                                                         onClick={() =>
                                                             handleAccept(
                                                                 invitation.id
@@ -233,6 +233,7 @@ export const InvitationsPage = () => {
                                                     </Button>
 
                                                     <Button
+                                                        type="button"
                                                         variant="outline"
                                                         onClick={() =>
                                                             handleDecline(
@@ -245,24 +246,20 @@ export const InvitationsPage = () => {
                                                         Отклонить
                                                     </Button>
                                                 </>
-                                            )}
-
-                                            {isAccepted && (
-                                                <Button
-                                                    asChild
-                                                    variant="outline"
-                                                >
+                                            ) : isAccepted ? (
+                                                <Button asChild>
                                                     <Link
                                                         to={`/boards/${invitation.boardId}`}
                                                     >
-                                                        Открыть доску
+                                                        <ExternalLink />
+                                                        Перейти к доске
                                                     </Link>
                                                 </Button>
-                                            )}
+                                            ) : null}
 
-                                            {invitation.status !==
-                                                'pending' && (
+                                            {!isPending && (
                                                 <Button
+                                                    type="button"
                                                     variant="outline"
                                                     onClick={() =>
                                                         handleDelete(

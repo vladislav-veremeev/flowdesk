@@ -23,9 +23,9 @@ import { toast } from 'sonner'
 const registerSchema = z.object({
     username: z
         .string()
+        .trim()
         .min(1, 'Введите имя пользователя')
         .min(3, 'Имя пользователя должно содержать минимум 3 символа'),
-    email: z.string().min(1, 'Введите email').email('Некорректный email'),
     password: z
         .string()
         .min(1, 'Введите пароль')
@@ -41,7 +41,6 @@ export const RegisterPage = () => {
         resolver: zodResolver(registerSchema),
         defaultValues: {
             username: '',
-            email: '',
             password: '',
         },
     })
@@ -88,30 +87,6 @@ export const RegisterPage = () => {
                             />
 
                             <Controller
-                                name="email"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <FieldLabel htmlFor="email">
-                                            Email
-                                        </FieldLabel>
-                                        <Input
-                                            {...field}
-                                            id="email"
-                                            type="email"
-                                            placeholder="Введите email"
-                                            aria-invalid={fieldState.invalid}
-                                        />
-                                        {fieldState.invalid && (
-                                            <FieldError
-                                                errors={[fieldState.error]}
-                                            />
-                                        )}
-                                    </Field>
-                                )}
-                            />
-
-                            <Controller
                                 name="password"
                                 control={form.control}
                                 render={({ field, fieldState }) => (
@@ -139,14 +114,14 @@ export const RegisterPage = () => {
                 </CardContent>
 
                 <CardFooter className="flex flex-col gap-3">
-                    <Field>
+                    <Field className="text-center">
                         <Button type="submit" form="form" className="w-full">
-                            Зарегестрироваться
+                            Зарегистрироваться
                         </Button>
                     </Field>
 
                     <div className="flex gap-1 text-sm text-muted-foreground">
-                        <span>Есть аккаунт?</span>
+                        <span>Уже есть аккаунт?</span>
                         <Button variant="link" className="p-0 h-auto" asChild>
                             <Link to="/login">Войти</Link>
                         </Button>

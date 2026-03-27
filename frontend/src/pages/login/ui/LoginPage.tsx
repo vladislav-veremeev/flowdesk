@@ -21,7 +21,11 @@ import z from 'zod'
 import { toast } from 'sonner'
 
 const loginSchema = z.object({
-    email: z.string().min(1, 'Введите email').email('Некорректный email'),
+    username: z
+        .string()
+        .trim()
+        .min(1, 'Введите имя пользователя')
+        .min(3, 'Имя пользователя должен содержать минимум 3 символа'),
     password: z
         .string()
         .min(1, 'Введите пароль')
@@ -36,7 +40,7 @@ export const LoginPage = () => {
     const form = useForm<LoginFormValues>({
         resolver: zodResolver(loginSchema),
         defaultValues: {
-            email: '',
+            username: '',
             password: '',
         },
     })
@@ -60,18 +64,17 @@ export const LoginPage = () => {
                     <form id="form" onSubmit={form.handleSubmit(onSubmit)}>
                         <FieldGroup>
                             <Controller
-                                name="email"
+                                name="username"
                                 control={form.control}
                                 render={({ field, fieldState }) => (
                                     <Field data-invalid={fieldState.invalid}>
-                                        <FieldLabel htmlFor="email">
-                                            Email
+                                        <FieldLabel htmlFor="username">
+                                            Имя пользователя
                                         </FieldLabel>
                                         <Input
                                             {...field}
-                                            id="email"
-                                            type="email"
-                                            placeholder="Введите email"
+                                            id="username"
+                                            placeholder="Введите имя пользователя"
                                             aria-invalid={fieldState.invalid}
                                         />
                                         {fieldState.invalid && (

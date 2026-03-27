@@ -29,7 +29,6 @@ export type BoardMemberRole = "owner" | "member";
 export type BoardMemberRow = {
     user_id: string;
     username: string;
-    email: string;
     role: BoardMemberRole;
     joined_at: string;
 };
@@ -37,7 +36,6 @@ export type BoardMemberRow = {
 export type BoardMember = {
     userId: string;
     username: string;
-    email: string;
     role: BoardMemberRole;
     joinedAt: string;
 };

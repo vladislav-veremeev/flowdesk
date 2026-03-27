@@ -29,7 +29,6 @@ function mapIncomingInvitation(
         boardTitle: row.board_title,
         inviterId: row.inviter_id,
         inviterUsername: row.inviter_username,
-        inviterEmail: row.inviter_email,
         inviteeId: row.invitee_id,
         status: row.status,
         createdAt: row.created_at,
@@ -42,29 +41,29 @@ export async function createBoardInvitation(
     data: CreateBoardInvitationBody
 ): Promise<BoardInvitation> {
     const boardId = data.boardId?.trim();
-    const inviteeEmail = data.inviteeEmail?.trim().toLowerCase();
+    const inviteeUsername = data.inviteeUsername?.trim();
 
     if (!boardId) {
         throw new Error("boardId обязателен");
     }
 
-    if (!inviteeEmail) {
-        throw new Error("Email приглашенного обязателен");
+    if (!inviteeUsername) {
+        throw new Error("Username приглашенного обязателен");
     }
 
     await ensureBoardOwner(boardId, userId);
 
-    const inviteeResult = await pool.query<{ id: string; email: string }>(
-        `SELECT id, email
+    const inviteeResult = await pool.query<{ id: string; username: string }>(
+        `SELECT id, username
          FROM users
-         WHERE LOWER(email) = $1`,
-        [inviteeEmail]
+         WHERE username = $1`,
+        [inviteeUsername]
     );
 
     const invitee = inviteeResult.rows[0];
 
     if (!invitee) {
-        throw new Error("Пользователь с таким email не найден");
+        throw new Error("Пользователь с таким username не найден");
     }
 
     if (invitee.id === userId) {
@@ -118,8 +117,7 @@ export async function getMyInvitations(
              bi.created_at,
              bi.responded_at,
              b.title AS board_title,
-             u.username AS inviter_username,
-             u.email AS inviter_email
+             u.username AS inviter_username
          FROM board_invitations bi
                   JOIN boards b ON b.id = bi.board_id
                   JOIN users u ON u.id = bi.inviter_id

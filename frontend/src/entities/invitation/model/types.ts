@@ -6,7 +6,6 @@ export interface IncomingInvitation {
     boardTitle: string
     inviterId: string
     inviterUsername: string
-    inviterEmail: string
     inviteeId: string
     status: InvitationStatus
     createdAt: string

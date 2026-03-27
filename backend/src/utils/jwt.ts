@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 export type AccessTokenPayload = {
     id: string;
     username: string;
-    email: string;
 };
 
 export function signAccessToken(payload: AccessTokenPayload): string {

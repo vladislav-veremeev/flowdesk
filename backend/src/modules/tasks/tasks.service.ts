@@ -17,29 +17,47 @@ function mapTask(row: TaskRow): Task {
         position: row.position,
         boardId: row.board_id,
         columnId: row.column_id,
-        assigneeId: row.assignee_id,
         dueDate: row.due_date,
+        assigneeId: row.assignee_id,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
 }
 
+function validateDueDateTime(dueDate?: string | null) {
+    if (!dueDate) {
+        return;
+    }
+
+    const parsedDueDate = new Date(dueDate);
+
+    if (Number.isNaN(parsedDueDate.getTime())) {
+        throw new Error("Некорректная дата и время срока задачи");
+    }
+
+    if (parsedDueDate.getTime() < Date.now()) {
+        throw new Error("Нельзя установить дату и время в прошлом");
+    }
+}
+
 async function ensureColumnBelongsToBoard(columnId: string, boardId: string) {
     const result = await pool.query(
-        "SELECT id, wip_limit FROM board_columns WHERE id = $1 AND board_id = $2",
+        `SELECT id
+         FROM board_columns
+         WHERE id = $1 AND board_id = $2`,
         [columnId, boardId]
     );
 
     if (result.rows.length === 0) {
         throw new Error("Колонка не найдена");
     }
-
-    return result.rows[0];
 }
 
 async function checkWipLimit(columnId: string) {
     const columnResult = await pool.query<{ wip_limit: number | null }>(
-        `SELECT wip_limit FROM board_columns WHERE id = $1`,
+        `SELECT wip_limit
+         FROM board_columns
+         WHERE id = $1`,
         [columnId]
     );
 
@@ -61,9 +79,9 @@ async function checkWipLimit(columnId: string) {
     }
 }
 
-async function ensureAssigneeIsBoardMember(
+async function ensureTaskAssigneeBelongsToBoard(
     boardId: string,
-    assigneeId: string | null | undefined
+    assigneeId?: string | null
 ) {
     if (!assigneeId) {
         return;
@@ -77,7 +95,7 @@ async function ensureAssigneeIsBoardMember(
     );
 
     if (result.rows.length === 0) {
-        throw new Error("Исполнитель должен быть участником доски");
+        throw new Error("Назначенный пользователь не состоит в этой доске");
     }
 }
 
@@ -86,7 +104,7 @@ export async function getTasksByBoard(userId: string, boardId: string): Promise<
 
     const result = await pool.query<TaskRow>(
         `SELECT id, title, description, priority, position, board_id, column_id,
-                assignee_id, due_date, created_at, updated_at
+                due_date, assignee_id, created_at, updated_at
          FROM tasks
          WHERE board_id = $1
          ORDER BY column_id, position ASC`,
@@ -103,9 +121,11 @@ export async function createTask(userId: string, data: CreateTaskBody): Promise<
         throw new Error("Название задачи обязательно");
     }
 
+    validateDueDateTime(data.dueDate);
+
     await ensureBoardMember(data.boardId, userId);
     await ensureColumnBelongsToBoard(data.columnId, data.boardId);
-    await ensureAssigneeIsBoardMember(data.boardId, data.assigneeId);
+    await ensureTaskAssigneeBelongsToBoard(data.boardId, data.assigneeId);
     await checkWipLimit(data.columnId);
 
     const positionResult = await pool.query<{ next_position: number }>(
@@ -119,11 +139,11 @@ export async function createTask(userId: string, data: CreateTaskBody): Promise<
 
     const result = await pool.query<TaskRow>(
         `INSERT INTO tasks (
-            title, description, priority, position, board_id, column_id, assignee_id, due_date
+            title, description, priority, position, board_id, column_id, due_date, assignee_id
         )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id, title, description, priority, position, board_id, column_id,
-                   assignee_id, due_date, created_at, updated_at`,
+                   due_date, assignee_id, created_at, updated_at`,
         [
             title,
             data.description?.trim() || null,
@@ -131,8 +151,8 @@ export async function createTask(userId: string, data: CreateTaskBody): Promise<
             position,
             data.boardId,
             data.columnId,
-            data.assigneeId ?? null,
             data.dueDate ?? null,
+            data.assigneeId ?? null,
         ]
     );
 
@@ -150,6 +170,8 @@ export async function updateTask(
         throw new Error("Название задачи обязательно");
     }
 
+    validateDueDateTime(data.dueDate);
+
     const taskResult = await pool.query<{ board_id: string }>(
         `SELECT board_id
          FROM tasks
@@ -164,25 +186,25 @@ export async function updateTask(
     }
 
     await ensureBoardMember(task.board_id, userId);
-    await ensureAssigneeIsBoardMember(task.board_id, data.assigneeId);
+    await ensureTaskAssigneeBelongsToBoard(task.board_id, data.assigneeId);
 
     const result = await pool.query<TaskRow>(
         `UPDATE tasks
          SET title = $1,
              description = $2,
              priority = $3,
-             assignee_id = $4,
-             due_date = $5,
+             due_date = $4,
+             assignee_id = $5,
              updated_at = NOW()
          WHERE id = $6
          RETURNING id, title, description, priority, position, board_id, column_id,
-                   assignee_id, due_date, created_at, updated_at`,
+                   due_date, assignee_id, created_at, updated_at`,
         [
             title,
             data.description?.trim() || null,
             data.priority || "medium",
-            data.assigneeId ?? null,
             data.dueDate ?? null,
+            data.assigneeId ?? null,
             taskId,
         ]
     );
@@ -202,7 +224,7 @@ export async function moveTask(
 
         const taskResult = await client.query<TaskRow>(
             `SELECT id, title, description, priority, position, board_id, column_id,
-                    assignee_id, due_date, created_at, updated_at
+                    due_date, assignee_id, created_at, updated_at
              FROM tasks
              WHERE id = $1`,
             [taskId]
@@ -249,8 +271,8 @@ export async function moveTask(
             `UPDATE tasks
              SET column_id = $1, position = $2, updated_at = NOW()
              WHERE id = $3
-                 RETURNING id, title, description, priority, position, board_id, column_id,
-                       assignee_id, due_date, created_at, updated_at`,
+             RETURNING id, title, description, priority, position, board_id, column_id,
+                       due_date, assignee_id, created_at, updated_at`,
             [data.targetColumnId, data.targetPosition, taskId]
         );
 
@@ -266,29 +288,50 @@ export async function moveTask(
 }
 
 export async function deleteTask(userId: string, taskId: string): Promise<void> {
-    const taskResult = await pool.query<{ board_id: string }>(
-        `SELECT board_id
-         FROM tasks
-         WHERE id = $1`,
-        [taskId]
-    );
+    const client = await pool.connect();
 
-    const task = taskResult.rows[0];
+    try {
+        await client.query("BEGIN");
 
-    if (!task) {
-        throw new Error("Задача не найдена");
-    }
+        const taskResult = await client.query<{ board_id: string; column_id: string; position: number }>(
+            `SELECT board_id, column_id, position
+             FROM tasks
+             WHERE id = $1`,
+            [taskId]
+        );
 
-    await ensureBoardMember(task.board_id, userId);
+        const task = taskResult.rows[0];
 
-    const result = await pool.query(
-        `DELETE FROM tasks
-         WHERE id = $1
-         RETURNING id`,
-        [taskId]
-    );
+        if (!task) {
+            throw new Error("Задача не найдена");
+        }
 
-    if (result.rows.length === 0) {
-        throw new Error("Задача не найдена");
+        await ensureBoardMember(task.board_id, userId);
+
+        const deleteResult = await client.query(
+            `DELETE FROM tasks
+             WHERE id = $1
+             RETURNING id`,
+            [taskId]
+        );
+
+        if (deleteResult.rows.length === 0) {
+            throw new Error("Задача не найдена");
+        }
+
+        await client.query(
+            `UPDATE tasks
+             SET position = position - 1
+             WHERE column_id = $1
+               AND position > $2`,
+            [task.column_id, task.position]
+        );
+
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
     }
 }

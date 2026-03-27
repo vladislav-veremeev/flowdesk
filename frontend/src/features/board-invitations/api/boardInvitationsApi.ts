@@ -10,7 +10,7 @@ export const getMyInvitations = async () => {
 
 export const createBoardInvitation = async (payload: {
     boardId: string
-    inviteeEmail: string
+    inviteeUsername: string
 }) => {
     const response = await api.post('/board-invitations', payload)
     return response.data

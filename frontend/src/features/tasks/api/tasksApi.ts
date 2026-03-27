@@ -15,8 +15,8 @@ export const createTask = async (payload: {
     priority?: TaskPriority
     boardId: string
     columnId: string
-    assigneeId?: string | null
     dueDate?: string | null
+    assigneeId?: string | null
 }) => {
     const response = await api.post<Task>('/tasks', payload)
     return response.data
@@ -28,8 +28,8 @@ export const updateTask = async (
         title: string
         description?: string
         priority?: TaskPriority
-        assigneeId?: string | null
         dueDate?: string | null
+        assigneeId?: string | null
     }
 ) => {
     const response = await api.put<Task>(`/tasks/${taskId}`, payload)

@@ -1,5 +1,6 @@
 import { Controller, type UseFormReturn } from 'react-hook-form'
 import { Plus } from 'lucide-react'
+import type { BoardMember } from '@/entities/board-member'
 import { Button } from '@/components/ui/button'
 import {
     Field,
@@ -30,12 +31,14 @@ export type TaskFormValues = {
     description?: string
     priority: 'low' | 'medium' | 'high'
     dueDate?: string
+    assigneeId?: string
 }
 
 type AddTaskPopoverProps = {
     columnId: string
     open: boolean
     disabled?: boolean
+    members: BoardMember[]
     form: UseFormReturn<TaskFormValues>
     onOpenChange: (open: boolean) => void
     onSubmit: (columnId: string, data: TaskFormValues) => void
@@ -45,6 +48,7 @@ export const AddTaskPopover = ({
     columnId,
     open,
     disabled = false,
+    members,
     form,
     onOpenChange,
     onSubmit,
@@ -155,6 +159,56 @@ export const AddTaskPopover = ({
                                             <SelectItem value="high">
                                                 Высокий
                                             </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {fieldState.invalid && (
+                                        <FieldError
+                                            errors={[fieldState.error]}
+                                        />
+                                    )}
+                                </Field>
+                            )}
+                        />
+
+                        <Controller
+                            name="assigneeId"
+                            control={form.control}
+                            render={({ field, fieldState }) => (
+                                <Field data-invalid={fieldState.invalid}>
+                                    <FieldLabel
+                                        htmlFor={`task-assignee-${columnId}`}
+                                    >
+                                        Исполнитель
+                                    </FieldLabel>
+                                    <Select
+                                        name={field.name}
+                                        value={field.value ?? 'unassigned'}
+                                        onValueChange={(value) =>
+                                            field.onChange(
+                                                value === 'unassigned'
+                                                    ? undefined
+                                                    : value
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            id={`task-assignee-${columnId}`}
+                                            aria-invalid={fieldState.invalid}
+                                        >
+                                            <SelectValue placeholder="Выберите исполнителя" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="unassigned">
+                                                Не назначен
+                                            </SelectItem>
+                                            {members.map((member) => (
+                                                <SelectItem
+                                                    key={member.userId}
+                                                    value={member.userId}
+                                                >
+                                                    {member.username}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                     {fieldState.invalid && (

@@ -30,21 +30,20 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { ButtonGroup } from '@/components/ui/button-group'
 import {
     Card,
-    CardAction,
     CardContent,
     CardDescription,
     CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card.tsx'
-import { useBoardPage } from '@/pages/board'
 import { userStore } from '@/entities/user'
 import { Badge } from '@/components/ui/badge.tsx'
-import { leaveBoard } from '@/features/board-members'
+import { getBoardMembers, leaveBoard } from '@/features/board-members'
 import { toast } from 'sonner'
+import { useEffect, useState } from 'react'
+import type { BoardMember } from '@/entities/board-member'
 
 export type BoardFormValues = {
     title: string
@@ -70,11 +69,28 @@ export const BoardCard = ({
     onEdit,
     onDelete,
 }: BoardCardProps) => {
-    const { members } = useBoardPage(board.id)
     const user = userStore((state) => state.user)
     const isOwner = !!board && !!user && board.ownerId === user.id
+    const [members, setMembers] = useState<BoardMember[]>([])
+
+    useEffect(() => {
+        const loadMembers = async () => {
+            if (!board.id) return
+
+            try {
+                const membersData = await getBoardMembers(board.id)
+                setMembers(membersData)
+            } catch (error) {
+                console.error('Ошибка при загрузке участников доски:', error)
+            }
+        }
+
+        loadMembers()
+    }, [board.id])
 
     const handleLeaveBoard = async () => {
+        if (!board.id) return
+
         try {
             await leaveBoard(board.id)
             toast.success('Вы вышли из доски')
@@ -111,6 +127,7 @@ export const BoardCard = ({
             {board.description && (
                 <CardContent>{board.description}</CardContent>
             )}
+
             <CardFooter>
                 {isOwner ? (
                     <Field orientation="horizontal">
@@ -266,7 +283,7 @@ export const BoardCard = ({
                                     </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
-                        </AlertDialog>{' '}
+                        </AlertDialog>
                     </Field>
                 ) : (
                     <AlertDialog>
@@ -290,7 +307,10 @@ export const BoardCard = ({
 
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Отмена</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleLeaveBoard}>
+                                <AlertDialogAction
+                                    variant="destructive"
+                                    onClick={handleLeaveBoard}
+                                >
                                     Выйти
                                 </AlertDialogAction>
                             </AlertDialogFooter>

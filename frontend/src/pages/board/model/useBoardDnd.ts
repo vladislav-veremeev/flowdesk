@@ -16,7 +16,7 @@ import type { Task } from '@/entities/task'
 import { reorderColumns } from '@/features/columns'
 import { moveTask as moveTaskApi } from '@/features/tasks'
 
-const parseSortableId = (sortableId: string | number) => {
+export const parseSortableId = (sortableId: string | number) => {
     const value = String(sortableId)
 
     if (value.startsWith('column-')) {

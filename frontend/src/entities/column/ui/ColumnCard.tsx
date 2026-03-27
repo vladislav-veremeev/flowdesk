@@ -1,6 +1,7 @@
 import { Controller, useForm, type UseFormReturn } from 'react-hook-form'
 import { Pencil, Trash2 } from 'lucide-react'
 import type { Column } from '@/entities/column'
+import type { BoardMember } from '@/entities/board-member'
 import { type Task } from '@/entities/task'
 import { TaskCard } from '@/entities/task'
 import {
@@ -73,6 +74,7 @@ type ColumnCardProps = {
     column: ColumnWithTasks
     addTaskOpenColumnId: string | null
     taskForm: UseFormReturn<TaskFormValues>
+    members: BoardMember[]
     onOpenAddTask: (columnId: string) => void
     onResetTaskForm: () => void
     onAddTask: (columnId: string, data: TaskFormValues) => void
@@ -94,6 +96,7 @@ export const ColumnCard = ({
     column,
     addTaskOpenColumnId,
     taskForm,
+    members,
     onOpenAddTask,
     onResetTaskForm,
     onAddTask,
@@ -373,6 +376,7 @@ export const ColumnCard = ({
                                     task={task}
                                     onEdit={onEditTask}
                                     onDelete={onDeleteTask}
+                                    members={members}
                                 />
                             ))}
                         </ItemGroup>
@@ -389,6 +393,7 @@ export const ColumnCard = ({
                     columnId={column.id}
                     open={addTaskOpenColumnId === column.id}
                     disabled={Boolean(isWipLimitReached) || isOverlay}
+                    members={members}
                     form={taskForm}
                     onOpenChange={(open) => {
                         if (open) {
