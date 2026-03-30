@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Pencil, Trash2, User } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-import { type Task, TaskPriorityBadge } from '@/entities/task'
+import {
+    type Task,
+    taskDefaultValues,
+    type TaskFormValues,
+    TaskPriorityBadge,
+    taskSchema,
+} from '@/entities/task'
 import type { BoardMember } from '@/entities/board-member'
 import { formatDateTime, toDateTimeLocalValue } from '@/shared/lib'
-
 import { ButtonGroup } from '@/components/ui/button-group.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -57,24 +61,10 @@ import {
 } from '@/components/ui/card.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 
-const editTaskSchema = z.object({
-    title: z
-        .string()
-        .trim()
-        .min(1, 'Введите название задачи')
-        .max(255, 'Название задачи должно содержать не более 255 символов'),
-    description: z.string().max(5000, 'Описание слишком длинное').optional(),
-    priority: z.enum(['low', 'medium', 'high']),
-    dueDate: z.string().optional(),
-    assigneeId: z.string().optional(),
-})
-
-type EditTaskFormValues = z.infer<typeof editTaskSchema>
-
 type TaskCardProps = {
     task: Task
     members: BoardMember[]
-    onEdit: (taskId: string, data: EditTaskFormValues) => Promise<void>
+    onEdit: (taskId: string, data: TaskFormValues) => Promise<void>
     onDelete: (taskId: string) => Promise<void>
     isOverlay?: boolean
 }
@@ -92,15 +82,9 @@ export const TaskCard = ({
 
     const assignee = members.find((member) => member.userId === task.assigneeId)
 
-    const editForm = useForm<EditTaskFormValues>({
-        resolver: zodResolver(editTaskSchema),
-        defaultValues: {
-            title: task.title,
-            description: task.description ?? '',
-            priority: task.priority,
-            dueDate: toDateTimeLocalValue(task.dueDate),
-            assigneeId: task.assigneeId ?? undefined,
-        },
+    const editForm = useForm<TaskFormValues>({
+        resolver: zodResolver(taskSchema),
+        defaultValues: taskDefaultValues,
     })
 
     const {
@@ -143,7 +127,7 @@ export const TaskCard = ({
         }
     }
 
-    const handleSubmit = async (data: EditTaskFormValues) => {
+    const handleSubmit = async (data: TaskFormValues) => {
         await onEdit(task.id, data)
         setEditOpen(false)
     }

@@ -1,4 +1,9 @@
-import { useLogin } from '@/features/auth'
+import {
+    loginDefaultValues,
+    type LoginFormValues,
+    loginSchema,
+    useLogin,
+} from '@/features/auth'
 import {
     Card,
     CardContent,
@@ -17,39 +22,21 @@ import { Input } from '@/components/ui/input.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Link } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
-import z from 'zod'
-import { toast } from 'sonner'
-
-const loginSchema = z.object({
-    username: z
-        .string()
-        .trim()
-        .min(1, 'Введите имя пользователя')
-        .min(3, 'Имя пользователя должен содержать минимум 3 символа'),
-    password: z
-        .string()
-        .min(1, 'Введите пароль')
-        .min(6, 'Пароль должен содержать минимум 6 символов'),
-})
-
-type LoginFormValues = z.infer<typeof loginSchema>
+import { handleApiError } from '@/shared/lib'
 
 export const LoginPage = () => {
     const { handleLogin } = useLogin()
 
     const form = useForm<LoginFormValues>({
         resolver: zodResolver(loginSchema),
-        defaultValues: {
-            username: '',
-            password: '',
-        },
+        defaultValues: loginDefaultValues,
     })
 
     const onSubmit = async (data: LoginFormValues) => {
         try {
             await handleLogin(data)
-        } catch (error: any) {
-            toast.error(error.response?.data?.message)
+        } catch (error) {
+            handleApiError(error, 'Не удалось выполнить вход')
         }
     }
 

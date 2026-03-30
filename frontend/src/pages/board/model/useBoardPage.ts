@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-
 import type { Board } from '@/entities/board'
 import type { BoardMember } from '@/entities/board-member'
-import type { Column } from '@/entities/column'
-import type { Task } from '@/entities/task'
+import {
+    type Column,
+    columnDefaultValues,
+    type ColumnFormValues,
+    columnSchema,
+} from '@/entities/column'
+import {
+    type Task,
+    taskDefaultValues,
+    type TaskFormValues,
+    taskSchema,
+} from '@/entities/task'
 import { getBoardMembers } from '@/features/board-members'
 import { getBoardById } from '@/features/boards'
 import {
@@ -18,58 +26,18 @@ import {
 } from '@/features/columns'
 import { createTask, deleteTask, getTasks, updateTask } from '@/features/tasks'
 
-
 import { createBoardInvitation } from '@/features/board-invitations'
-
-const columnSchema = z.object({
-    title: z
-        .string()
-        .trim()
-        .min(1, 'Введите название колонки')
-        .max(255, 'Название колонки должно содержать не более 255 символов'),
-    wipLimit: z.string().optional(),
-})
-
-const taskSchema = z.object({
-    title: z
-        .string()
-        .trim()
-        .min(1, 'Введите название задачи')
-        .max(255, 'Название задачи должно содержать не более 255 символов'),
-    description: z.string().max(5000, 'Описание слишком длинное').optional(),
-    priority: z.enum(['low', 'medium', 'high']),
-    dueDate: z.string().optional(),
-    assigneeId: z.string().optional(),
-})
-
-const inviteSchema = z.object({
-    username: z
-        .string()
-        .trim()
-        .min(1, 'Введите имя пользователя')
-        .min(3, 'Имя пользователя должно содержать минимум 3 символа'),
-})
-
-export type ColumnFormValues = z.infer<typeof columnSchema>
-export type TaskFormValues = z.infer<typeof taskSchema>
-export type InviteFormValues = z.infer<typeof inviteSchema>
-
-const columnDefaultValues: ColumnFormValues = {
-    title: '',
-    wipLimit: '',
-}
-
-const taskDefaultValues: TaskFormValues = {
-    title: '',
-    description: '',
-    priority: 'medium',
-    dueDate: '',
-    assigneeId: undefined,
-}
-
-const inviteDefaultValues: InviteFormValues = {
-    username: '',
-}
+import {
+    getApiErrorMessage,
+    handleApiError,
+    normalizeColumnForm,
+    normalizeTaskForm,
+} from '@/shared/lib'
+import {
+    inviteDefaultValues,
+    type InviteFormValues,
+    inviteSchema,
+} from '@/entities/invitation'
 
 export const useBoardPage = (boardId?: string) => {
     const [board, setBoard] = useState<Board | null>(null)
@@ -130,8 +98,7 @@ export const useBoardPage = (boardId?: string) => {
                 setTasks([])
 
                 setLoadError(
-                    error.response?.data?.message ||
-                        'Не удалось загрузить доску'
+                    getApiErrorMessage(error, 'Не удалось загрузить доску')
                 )
             } finally {
                 setIsLoading(false)
@@ -158,23 +125,12 @@ export const useBoardPage = (boardId?: string) => {
         if (!boardId) return
 
         try {
-            const trimmedWip = data.wipLimit?.trim()
-
-            if (
-                trimmedWip &&
-                (Number.isNaN(Number(trimmedWip)) || Number(trimmedWip) < 1)
-            ) {
-                columnForm.setError('wipLimit', {
-                    type: 'manual',
-                    message: 'WIP-лимит должен быть числом больше 0',
-                })
-                return
-            }
+            const normalized = normalizeColumnForm(data)
 
             const newColumn = await createColumn({
-                title: data.title.trim(),
+                title: normalized.title,
                 boardId,
-                wipLimit: trimmedWip ? Number(trimmedWip) : undefined,
+                wipLimit: normalized.wipLimit ?? undefined,
             })
 
             setColumns((current) =>
@@ -184,10 +140,8 @@ export const useBoardPage = (boardId?: string) => {
             toast.success('Колонка успешно создана')
             resetColumnForm()
             setAddColumnOpen(false)
-        } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось создать колонку'
-            )
+        } catch (error) {
+            handleApiError(error, 'Не удалось создать колонку')
         }
     }
 
@@ -196,11 +150,11 @@ export const useBoardPage = (boardId?: string) => {
         data: ColumnFormValues
     ) => {
         try {
-            const trimmedWip = data.wipLimit?.trim()
+            const normalized = normalizeColumnForm(data)
 
             const updatedColumn = await updateColumn(columnId, {
-                title: data.title.trim(),
-                wipLimit: trimmedWip ? Number(trimmedWip) : null,
+                title: normalized.title,
+                wipLimit: normalized.wipLimit,
             })
 
             setColumns((current) =>
@@ -210,13 +164,8 @@ export const useBoardPage = (boardId?: string) => {
             )
 
             toast.success('Колонка успешно обновлена')
-        } catch (error: any) {
-            toast.error(
-                error.response?.data?.message ||
-                    error.message ||
-                    'Не удалось обновить колонку'
-            )
-            throw error
+        } catch (error) {
+            handleApiError(error, 'Не удалось обновить колонку')
         }
     }
 
@@ -233,9 +182,7 @@ export const useBoardPage = (boardId?: string) => {
 
             toast.success('Колонка успешно удалена')
         } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось удалить колонку'
-            )
+            handleApiError(error, 'Не удалось удалить колонку')
         }
     }
 
@@ -248,39 +195,39 @@ export const useBoardPage = (boardId?: string) => {
         if (!boardId) return
 
         try {
+            const normalized = normalizeTaskForm(data)
+
             const newTask = await createTask({
-                title: data.title.trim(),
-                description: data.description?.trim() || undefined,
-                priority: data.priority,
+                title: normalized.title,
+                description: normalized.description,
+                priority: normalized.priority,
+                dueDate: normalized.dueDate,
+                assigneeId: normalized.assigneeId,
                 boardId,
                 columnId,
-                dueDate: data.dueDate
-                    ? new Date(data.dueDate).toISOString()
-                    : null,
-                assigneeId: data.assigneeId || null,
             })
 
-            setTasks((current) => [...current, newTask])
+            setTasks((current) =>
+                [...current, newTask].sort((a, b) => a.position - b.position)
+            )
 
             toast.success('Задача успешно создана')
             resetTaskForm()
-        } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось создать задачу'
-            )
+        } catch (error) {
+            handleApiError(error, 'Не удалось создать задачу')
         }
     }
 
     const handleEditTask = async (taskId: string, data: TaskFormValues) => {
         try {
+            const normalized = normalizeTaskForm(data)
+
             const updatedTask = await updateTask(taskId, {
-                title: data.title.trim(),
-                description: data.description?.trim() || undefined,
-                priority: data.priority,
-                dueDate: data.dueDate
-                    ? new Date(data.dueDate).toISOString()
-                    : null,
-                assigneeId: data.assigneeId || null,
+                title: normalized.title,
+                description: normalized.description,
+                priority: normalized.priority,
+                dueDate: normalized.dueDate,
+                assigneeId: normalized.assigneeId,
             })
 
             setTasks((current) =>
@@ -288,10 +235,8 @@ export const useBoardPage = (boardId?: string) => {
             )
 
             toast.success('Задача успешно обновлена')
-        } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось обновить задачу'
-            )
+        } catch (error) {
+            handleApiError(error, 'Не удалось обновить задачу')
         }
     }
 
@@ -303,9 +248,7 @@ export const useBoardPage = (boardId?: string) => {
 
             toast.success('Задача успешно удалена')
         } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось удалить задачу'
-            )
+            handleApiError(error, 'Не удалось удалить задачу')
         }
     }
 
@@ -322,10 +265,7 @@ export const useBoardPage = (boardId?: string) => {
             resetInviteForm()
             setInviteDialogOpen(false)
         } catch (error: any) {
-            toast.error(
-                error.response?.data?.message ||
-                    'Не удалось отправить приглашение'
-            )
+            handleApiError(error, 'Не удалось отправить приглашение')
         }
     }
 

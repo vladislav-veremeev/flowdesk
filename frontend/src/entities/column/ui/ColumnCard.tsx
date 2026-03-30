@@ -1,8 +1,12 @@
 import { Controller, useForm, type UseFormReturn } from 'react-hook-form'
 import { Pencil, Trash2 } from 'lucide-react'
-import type { Column } from '@/entities/column'
+import {
+    type Column,
+    type ColumnFormValues,
+    columnSchema,
+} from '@/entities/column'
 import type { BoardMember } from '@/entities/board-member'
-import { type Task } from '@/entities/task'
+import { type Task, type TaskFormValues } from '@/entities/task'
 import { TaskCard } from '@/entities/task'
 import {
     Card,
@@ -32,7 +36,6 @@ import { ItemGroup } from '@/components/ui/item'
 import { Badge } from '@/components/ui/badge.tsx'
 import { useMemo, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import z from 'zod'
 import { ButtonGroup } from '@/components/ui/button-group.tsx'
 import {
     AlertDialogAction,
@@ -53,22 +56,10 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils.ts'
-import type { TaskFormValues } from '@/pages/board'
 
 type ColumnWithTasks = Column & {
     tasks: Task[]
 }
-
-const editColumnSchema = z.object({
-    title: z
-        .string()
-        .trim()
-        .min(1, 'Введите название колонки')
-        .max(255, 'Название колонки должно содержать не более 255 символов'),
-    wipLimit: z.string().optional(),
-})
-
-type EditColumnFormValues = z.infer<typeof editColumnSchema>
 
 type ColumnCardProps = {
     column: ColumnWithTasks
@@ -80,10 +71,7 @@ type ColumnCardProps = {
     onAddTask: (columnId: string, data: TaskFormValues) => void
     onEditTask: (taskId: string, data: TaskFormValues) => Promise<void>
     onDeleteTask: (taskId: string) => Promise<void>
-    onEditColumn: (
-        columnId: string,
-        data: EditColumnFormValues
-    ) => Promise<void>
+    onEditColumn: (columnId: string, data: ColumnFormValues) => Promise<void>
     onDeleteColumn: (columnId: string) => Promise<void>
     isOverlay?: boolean
     canManageColumn?: boolean
@@ -109,8 +97,8 @@ export const ColumnCard = ({
 }: ColumnCardProps) => {
     const [editOpen, setEditOpen] = useState(false)
 
-    const editColumnForm = useForm<EditColumnFormValues>({
-        resolver: zodResolver(editColumnSchema),
+    const editColumnForm = useForm<ColumnFormValues>({
+        resolver: zodResolver(columnSchema),
         defaultValues: {
             title: column.title,
             wipLimit: column.wipLimit?.toString() ?? '',
@@ -158,20 +146,7 @@ export const ColumnCard = ({
         }
     }
 
-    const handleEditSubmit = async (data: EditColumnFormValues) => {
-        const trimmedWip = data.wipLimit?.trim()
-
-        if (
-            trimmedWip &&
-            (Number.isNaN(Number(trimmedWip)) || Number(trimmedWip) < 1)
-        ) {
-            editColumnForm.setError('wipLimit', {
-                type: 'manual',
-                message: 'Лимит задач должен быть числом больше 0',
-            })
-            return
-        }
-
+    const handleEditSubmit = async (data: ColumnFormValues) => {
         await onEditColumn(column.id, data)
         setEditOpen(false)
     }

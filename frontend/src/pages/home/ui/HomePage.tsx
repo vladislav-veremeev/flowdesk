@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
-import { z } from 'zod'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import type { Board } from '@/entities/board'
+import { type Board, boardDefaultValues, boardSchema } from '@/entities/board'
 import { BoardCard, type BoardFormValues } from '@/entities/board'
 import {
     createBoard,
@@ -35,22 +34,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog.tsx'
-
-const boardSchema = z.object({
-    title: z
-        .string()
-        .trim()
-        .min(1, 'Введите название доски')
-        .max(100, 'Название доски должно содержать не более 100 символов'),
-    description: z
-        .string()
-        .max(500, 'Описание должно содержать не более 500 символов'),
-})
-
-const defaultValues: BoardFormValues = {
-    title: '',
-    description: '',
-}
+import { handleApiError, normalizeBoardForm } from '@/shared/lib'
 
 export const HomePage = () => {
     const [boards, setBoards] = useState<Board[]>([])
@@ -60,12 +44,12 @@ export const HomePage = () => {
 
     const createForm = useForm<BoardFormValues>({
         resolver: zodResolver(boardSchema),
-        defaultValues,
+        defaultValues: boardDefaultValues,
     })
 
     const editForm = useForm<BoardFormValues>({
         resolver: zodResolver(boardSchema),
-        defaultValues,
+        defaultValues: boardDefaultValues,
     })
 
     const loadBoards = async () => {
@@ -73,9 +57,7 @@ export const HomePage = () => {
             const data = await getBoards()
             setBoards(data)
         } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось загрузить доски'
-            )
+            handleApiError(error, 'Не удалось загрузить доски')
         }
     }
 
@@ -84,11 +66,11 @@ export const HomePage = () => {
     }, [])
 
     const resetCreateForm = () => {
-        createForm.reset(defaultValues)
+        createForm.reset(boardDefaultValues)
     }
 
     const resetEditForm = () => {
-        editForm.reset(defaultValues)
+        editForm.reset(boardDefaultValues)
         setEditingBoard(null)
         setEditOpenBoardId(null)
     }
@@ -106,44 +88,34 @@ export const HomePage = () => {
         if (!editingBoard) return
 
         try {
-            const payload = {
-                title: data.title.trim(),
-                description: data.description.trim() || undefined,
-            }
+            const updatedBoard = await updateBoard(
+                editingBoard.id,
+                normalizeBoardForm(data)
+            )
 
-            const updatedBoard = await updateBoard(editingBoard.id, payload)
             setBoards((current) =>
                 current.map((board) =>
                     board.id === updatedBoard.id ? updatedBoard : board
                 )
             )
-            toast.success('Доска успешно обновлена')
 
+            toast.success('Доска успешно обновлена')
             resetEditForm()
-        } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось сохранить доску'
-            )
+        } catch (error) {
+            handleApiError(error, 'Не удалось сохранить доску')
         }
     }
 
     const handleAdd = async (data: BoardFormValues) => {
         try {
-            const payload = {
-                title: data.title.trim(),
-                description: data.description.trim() || undefined,
-            }
-
-            const newBoard = await createBoard(payload)
+            const newBoard = await createBoard(normalizeBoardForm(data))
             setBoards((current) => [newBoard, ...current])
             toast.success('Доска успешно создана')
 
             resetCreateForm()
             setCreateOpen(false)
-        } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось добавить доску'
-            )
+        } catch (error) {
+            handleApiError(error, 'Не удалось добавить доску')
         }
     }
 
@@ -159,10 +131,8 @@ export const HomePage = () => {
             }
 
             toast.success('Доска удалена')
-        } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Не удалось удалить доску'
-            )
+        } catch (error) {
+            handleApiError(error, 'Не удалось удалить доску')
         }
     }
 

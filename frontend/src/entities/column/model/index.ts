@@ -1,1 +1,2 @@
-export * from './types.ts'
+export * from './types'
+export * from './column.schema'

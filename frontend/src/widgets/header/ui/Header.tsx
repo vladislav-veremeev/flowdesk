@@ -1,12 +1,48 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button.tsx'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, LogOut, Mail, UserRound } from 'lucide-react'
-import { userStore } from '@/entities/user'
+
+import { Button } from '@/components/ui/button.tsx'
 import { ButtonGroup } from '@/components/ui/button-group.tsx'
+import { userStore } from '@/entities/user'
+import { getMyInvitations } from '@/features/board-invitations'
+import { Badge } from '@/components/ui/badge.tsx'
 
 export const Header = () => {
     const user = userStore((state) => state.user)
     const navigate = useNavigate()
+    const location = useLocation()
+
+    const [pendingInvitationsCount, setPendingInvitationsCount] = useState(0)
+
+    const loadPendingInvitations = async () => {
+        try {
+            const invitations = await getMyInvitations()
+            const pendingCount = invitations.filter(
+                (invitation) => invitation.status === 'pending'
+            ).length
+
+            setPendingInvitationsCount(pendingCount)
+        } catch {
+            setPendingInvitationsCount(0)
+        }
+    }
+
+    useEffect(() => {
+        void loadPendingInvitations()
+    }, [location.pathname])
+
+    useEffect(() => {
+        const handleFocus = () => {
+            void loadPendingInvitations()
+        }
+
+        window.addEventListener('focus', handleFocus)
+
+        return () => {
+            window.removeEventListener('focus', handleFocus)
+        }
+    }, [])
 
     const handleLogout = () => {
         localStorage.removeItem('token')
@@ -29,9 +65,12 @@ export const Header = () => {
                 </Button>
 
                 <Button variant="outline" asChild>
-                    <Link to="/invitations">
+                    <Link to="/invitations" className="relative">
                         <Mail />
                         Приглашения
+                        {pendingInvitationsCount > 0 && (
+                            <Badge>{pendingInvitationsCount}</Badge>
+                        )}
                     </Link>
                 </Button>
 

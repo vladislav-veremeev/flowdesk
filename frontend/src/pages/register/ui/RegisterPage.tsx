@@ -1,4 +1,9 @@
-import { useRegister } from '@/features/auth'
+import {
+    registerDefaultValues,
+    type RegisterFormValues,
+    registerSchema,
+    useRegister,
+} from '@/features/auth'
 import { Controller, useForm } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -16,40 +21,22 @@ import {
     FieldLabel,
 } from '@/components/ui/field'
 import { Link } from 'react-router-dom'
-import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { toast } from 'sonner'
-
-const registerSchema = z.object({
-    username: z
-        .string()
-        .trim()
-        .min(1, 'Введите имя пользователя')
-        .min(3, 'Имя пользователя должно содержать минимум 3 символа'),
-    password: z
-        .string()
-        .min(1, 'Введите пароль')
-        .min(6, 'Пароль должен содержать минимум 6 символов'),
-})
-
-type RegisterFormValues = z.infer<typeof registerSchema>
+import { handleApiError } from '@/shared/lib'
 
 export const RegisterPage = () => {
     const { handleRegister } = useRegister()
 
     const form = useForm<RegisterFormValues>({
         resolver: zodResolver(registerSchema),
-        defaultValues: {
-            username: '',
-            password: '',
-        },
+        defaultValues: registerDefaultValues,
     })
 
     const onSubmit = async (data: RegisterFormValues) => {
         try {
             await handleRegister(data)
         } catch (error: any) {
-            toast.error(error.response?.data?.message)
+            handleApiError(error, 'Не удалось выполнить регистрацию')
         }
     }
 

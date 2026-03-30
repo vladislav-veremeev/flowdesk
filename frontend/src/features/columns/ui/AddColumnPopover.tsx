@@ -102,10 +102,8 @@ export const AddColumnPopover = ({
                                     </FieldLabel>
                                     <Input
                                         {...field}
-                                        value={field.value ?? ''}
                                         id="column-wip-limit"
                                         type="number"
-                                        min={1}
                                         placeholder="Введите лимит"
                                         aria-invalid={fieldState.invalid}
                                     />
