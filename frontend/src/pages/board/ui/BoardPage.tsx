@@ -16,9 +16,8 @@ import {
     ItemTitle,
 } from '@/components/ui/item.tsx'
 import { BoardPageHeader } from '@/pages/board'
-
-import { useBoardPage } from '../model/useBoardPage'
-import { useBoardDnd } from '../model/useBoardDnd'
+import { useBoardPage } from '@/pages/board'
+import { useBoardDnd } from '@/pages/board'
 
 export const BoardPage = () => {
     const { id } = useParams<{ id: string }>()
@@ -136,11 +135,12 @@ export const BoardPage = () => {
                 onDragEnd={handleDragEnd}
             >
                 <div className="flex h-full gap-6 overflow-x-auto">
-                    {tasksByColumn.map((column) => (
+                    {tasksByColumn.map((column, index) => (
                         <ColumnCard
                             key={column.id}
                             column={column}
                             canManageColumn={isOwner}
+                            canAddTask={index === 0}
                             addTaskOpenColumnId={addTaskOpenColumnId}
                             taskForm={taskForm}
                             members={members}

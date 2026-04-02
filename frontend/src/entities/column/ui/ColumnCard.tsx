@@ -68,8 +68,8 @@ type ColumnCardProps = {
     onDeleteTask: (taskId: string) => Promise<void>
     onEditColumn: (columnId: string, data: ColumnFormValues) => Promise<void>
     onDeleteColumn: (columnId: string) => Promise<void>
-    isOverlay?: boolean
     canManageColumn?: boolean
+    canAddTask?: boolean
 }
 
 const getTaskSortableId = (taskId: string) => `task-${taskId}`
@@ -86,7 +86,8 @@ export const ColumnCard = ({
     onEditColumn,
     onDeleteTask,
     onDeleteColumn,
-    canManageColumn = true,
+    canManageColumn,
+    canAddTask,
 }: ColumnCardProps) => {
     const [editOpen, setEditOpen] = useState(false)
 
@@ -325,22 +326,24 @@ export const ColumnCard = ({
                 </SortableContext>
             </CardContent>
 
-            <CardFooter className="px-4">
-                <AddTaskPopover
-                    columnId={column.id}
-                    open={addTaskOpenColumnId === column.id}
-                    members={members}
-                    form={taskForm}
-                    onOpenChange={(open) => {
-                        if (open) {
-                            onOpenAddTask(column.id)
-                        } else if (addTaskOpenColumnId === column.id) {
-                            onResetTaskForm()
-                        }
-                    }}
-                    onSubmit={onAddTask}
-                />
-            </CardFooter>
+            {canAddTask && (
+                <CardFooter className="px-4">
+                    <AddTaskPopover
+                        columnId={column.id}
+                        open={addTaskOpenColumnId === column.id}
+                        members={members}
+                        form={taskForm}
+                        onOpenChange={(open) => {
+                            if (open) {
+                                onOpenAddTask(column.id)
+                            } else if (addTaskOpenColumnId === column.id) {
+                                onResetTaskForm()
+                            }
+                        }}
+                        onSubmit={onAddTask}
+                    />
+                </CardFooter>
+            )}
         </Card>
     )
 }

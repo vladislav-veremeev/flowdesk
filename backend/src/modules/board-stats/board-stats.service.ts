@@ -1,6 +1,10 @@
 import { pool } from "../../config/db";
 import { ensureBoardMember } from "../boards/boards.access";
-import { BoardStatsResponse, StatsBucketType, StatsSeriesPoint } from "./board-stats.types";
+import {
+    BoardStatsResponse,
+    StatsBucketType,
+    StatsSeriesPoint,
+} from "./board-stats.types";
 
 type TaskHistoryEventRow = {
     task_ref: string;
@@ -17,6 +21,11 @@ type TaskTimelineEvent = {
     toStage: "todo" | "in_progress" | "done" | null;
 };
 
+type WipChangeEvent = {
+    occurredAt: Date;
+    delta: number;
+};
+
 function roundToTwo(value: number | null): number | null {
     if (value === null) {
         return null;
@@ -26,11 +35,19 @@ function roundToTwo(value: number | null): number | null {
 }
 
 function toHourBucket(date: Date) {
-    return `${date.toISOString().slice(0, 13)}:00:00.000Z`;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+        2,
+        "0"
+    )}-${String(date.getDate()).padStart(2, "0")}T${String(
+        date.getHours()
+    ).padStart(2, "0")}:00:00`;
 }
 
 function toDayBucket(date: Date) {
-    return `${date.toISOString().slice(0, 10)}T00:00:00.000Z`;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+        2,
+        "0"
+    )}-${String(date.getDate()).padStart(2, "0")}T00:00:00`;
 }
 
 function getBucketKey(date: Date, bucketType: StatsBucketType) {
@@ -43,30 +60,25 @@ function buildBucketRange(period: 1 | 7 | 30, bucketType: StatsBucketType) {
 
     if (bucketType === "hour") {
         const currentHour = new Date(now);
-        currentHour.setUTCMinutes(0, 0, 0);
+        currentHour.setMinutes(0, 0, 0);
 
         for (let index = 23; index >= 0; index--) {
             const bucketDate = new Date(currentHour);
-            bucketDate.setUTCHours(currentHour.getUTCHours() - index);
+            bucketDate.setHours(currentHour.getHours() - index);
             buckets.push(toHourBucket(bucketDate));
         }
     } else {
         const currentDay = new Date(now);
-        currentDay.setUTCHours(0, 0, 0, 0);
+        currentDay.setHours(0, 0, 0, 0);
 
         for (let index = period - 1; index >= 0; index--) {
             const bucketDate = new Date(currentDay);
-            bucketDate.setUTCDate(currentDay.getUTCDate() - index);
+            bucketDate.setDate(currentDay.getDate() - index);
             buckets.push(toDayBucket(bucketDate));
         }
     }
 
     return buckets;
-}
-
-function getRangeStart(period: 1 | 7 | 30, bucketType: StatsBucketType) {
-    const buckets = buildBucketRange(period, bucketType);
-    return new Date(buckets[0]);
 }
 
 function groupEventsByTask(events: TaskHistoryEventRow[]) {
@@ -110,7 +122,8 @@ function buildAverageSeries(
             };
         }
 
-        const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+        const average =
+            values.reduce((sum, value) => sum + value, 0) / values.length;
 
         return {
             bucket,
@@ -138,7 +151,7 @@ export async function getBoardStats(
 
     const bucketType: StatsBucketType = period === 1 ? "hour" : "day";
     const buckets = buildBucketRange(period, bucketType);
-    const rangeStart = getRangeStart(period, bucketType);
+    const rangeStart = new Date(buckets[0]);
 
     const eventsResult = await pool.query<TaskHistoryEventRow>(
         `SELECT task_ref, event_type, occurred_at, from_stage, to_stage
@@ -153,7 +166,7 @@ export async function getBoardStats(
     const leadTimeValuesByBucket = new Map<string, number[]>();
     const cycleTimeValuesByBucket = new Map<string, number[]>();
     const throughputByBucket = new Map<string, number>();
-    const wipChanges = new Map<string, number>();
+    const wipChangeEvents: WipChangeEvent[] = [];
 
     for (const [, taskEvents] of eventsByTask) {
         let createdAt: Date | null = null;
@@ -165,10 +178,7 @@ export async function getBoardStats(
                 createdAt = event.occurredAt;
             }
 
-            if (
-                !firstInProgressAt &&
-                event.toStage === "in_progress"
-            ) {
+            if (!firstInProgressAt && event.toStage === "in_progress") {
                 firstInProgressAt = event.occurredAt;
             }
 
@@ -176,52 +186,71 @@ export async function getBoardStats(
                 firstDoneAt = event.occurredAt;
             }
 
-            const leftInProgress = event.fromStage === "in_progress" && event.toStage !== "in_progress";
             const enteredInProgress =
-                event.fromStage !== "in_progress" && event.toStage === "in_progress";
+                event.fromStage !== "in_progress" &&
+                event.toStage === "in_progress";
+
+            const leftInProgress =
+                event.fromStage === "in_progress" &&
+                event.toStage !== "in_progress";
 
             if (enteredInProgress) {
-                const bucket = getBucketKey(event.occurredAt, bucketType);
-                wipChanges.set(bucket, (wipChanges.get(bucket) ?? 0) + 1);
+                wipChangeEvents.push({
+                    occurredAt: event.occurredAt,
+                    delta: 1,
+                });
             }
 
             if (leftInProgress) {
-                const bucket = getBucketKey(event.occurredAt, bucketType);
-                wipChanges.set(bucket, (wipChanges.get(bucket) ?? 0) - 1);
+                wipChangeEvents.push({
+                    occurredAt: event.occurredAt,
+                    delta: -1,
+                });
             }
         }
 
-        if (createdAt && firstDoneAt) {
+        if (createdAt && firstDoneAt && firstDoneAt >= rangeStart) {
             const leadTimeHours =
-                (firstDoneAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+                (firstDoneAt.getTime() - createdAt.getTime()) /
+                (1000 * 60 * 60);
 
-            if (firstDoneAt >= rangeStart) {
-                const bucket = getBucketKey(firstDoneAt, bucketType);
-                const current = leadTimeValuesByBucket.get(bucket) ?? [];
-                current.push(leadTimeHours);
-                leadTimeValuesByBucket.set(bucket, current);
+            const bucket = getBucketKey(firstDoneAt, bucketType);
+            const current = leadTimeValuesByBucket.get(bucket) ?? [];
+            current.push(leadTimeHours);
+            leadTimeValuesByBucket.set(bucket, current);
 
-                throughputByBucket.set(bucket, (throughputByBucket.get(bucket) ?? 0) + 1);
-            }
+            throughputByBucket.set(
+                bucket,
+                (throughputByBucket.get(bucket) ?? 0) + 1
+            );
         }
 
-        if (firstInProgressAt && firstDoneAt && firstDoneAt >= firstInProgressAt) {
+        if (
+            firstInProgressAt &&
+            firstDoneAt &&
+            firstDoneAt >= firstInProgressAt &&
+            firstDoneAt >= rangeStart
+        ) {
             const cycleTimeHours =
-                (firstDoneAt.getTime() - firstInProgressAt.getTime()) / (1000 * 60 * 60);
+                (firstDoneAt.getTime() - firstInProgressAt.getTime()) /
+                (1000 * 60 * 60);
 
-            if (firstDoneAt >= rangeStart) {
-                const bucket = getBucketKey(firstDoneAt, bucketType);
-                const current = cycleTimeValuesByBucket.get(bucket) ?? [];
-                current.push(cycleTimeHours);
-                cycleTimeValuesByBucket.set(bucket, current);
-            }
+            const bucket = getBucketKey(firstDoneAt, bucketType);
+            const current = cycleTimeValuesByBucket.get(bucket) ?? [];
+            current.push(cycleTimeHours);
+            cycleTimeValuesByBucket.set(bucket, current);
         }
     }
 
-    let currentWip = 0;
+    wipChangeEvents.sort(
+        (left, right) => left.occurredAt.getTime() - right.occurredAt.getTime()
+    );
+
+    let currentWipAtRangeStart = 0;
 
     for (const [, taskEvents] of eventsByTask) {
-        let latestStageBeforeRange: "todo" | "in_progress" | "done" | null = null;
+        let latestStageBeforeRange: "todo" | "in_progress" | "done" | null =
+            null;
 
         for (const event of taskEvents) {
             if (event.occurredAt >= rangeStart) {
@@ -232,16 +261,44 @@ export async function getBoardStats(
         }
 
         if (latestStageBeforeRange === "in_progress") {
-            currentWip += 1;
+            currentWipAtRangeStart += 1;
         }
     }
 
     const wipSeries: StatsSeriesPoint[] = [];
-    for (const bucket of buckets) {
-        currentWip += wipChanges.get(bucket) ?? 0;
+    let currentWip = currentWipAtRangeStart;
+    let wipEventIndex = 0;
+
+    for (let index = 0; index < buckets.length; index++) {
+        const bucket = buckets[index];
+        const bucketStart = new Date(bucket);
+
+        const bucketEnd =
+            index < buckets.length - 1
+                ? new Date(buckets[index + 1])
+                : new Date(
+                    bucketType === "hour"
+                        ? bucketStart.getTime() + 60 * 60 * 1000
+                        : bucketStart.getTime() + 24 * 60 * 60 * 1000
+                );
+
+        let bucketMaxWip = currentWip;
+
+        while (
+            wipEventIndex < wipChangeEvents.length &&
+            wipChangeEvents[wipEventIndex].occurredAt < bucketEnd
+            ) {
+            if (wipChangeEvents[wipEventIndex].occurredAt >= bucketStart) {
+                currentWip += wipChangeEvents[wipEventIndex].delta;
+                bucketMaxWip = Math.max(bucketMaxWip, currentWip);
+            }
+
+            wipEventIndex += 1;
+        }
+
         wipSeries.push({
             bucket,
-            value: currentWip,
+            value: bucketMaxWip,
         });
     }
 
