@@ -1,5 +1,5 @@
 import { api } from '@/shared/api'
-import type { IncomingInvitation } from '@/entities/invitation'
+import type { IncomingInvitation } from '@/entities/board-invitation'
 
 export const getMyInvitations = async () => {
     const response = await api.get<IncomingInvitation[]>(

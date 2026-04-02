@@ -18,10 +18,6 @@ export type UpdateColumnBody = {
     wipLimit?: number | null;
 };
 
-export type ReorderColumnsBody = {
-    orderedIds: string[];
-};
-
 export type Column = {
     id: string;
     title: string;

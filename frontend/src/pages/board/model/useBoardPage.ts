@@ -37,7 +37,7 @@ import {
     inviteDefaultValues,
     type InviteFormValues,
     inviteSchema,
-} from '@/entities/invitation'
+} from '@/entities/board-invitation'
 
 export const useBoardPage = (boardId?: string) => {
     const [board, setBoard] = useState<Board | null>(null)

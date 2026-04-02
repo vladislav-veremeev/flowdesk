@@ -120,9 +120,9 @@ export const TaskCard = ({
             editForm.reset({
                 title: task.title,
                 description: task.description ?? '',
-                priority: task.priority,
+                priority: task.priority ?? 'none',
                 dueDate: toDateTimeLocalValue(task.dueDate),
-                assigneeId: task.assigneeId ?? undefined,
+                assigneeId: task.assigneeId ?? 'none',
             })
         }
     }
@@ -155,9 +155,15 @@ export const TaskCard = ({
                 </CardTitle>
 
                 <CardDescription className="flex flex-wrap gap-2">
-                    <TaskPriorityBadge priority={task.priority} />
+                    {task.priority && (
+                        <TaskPriorityBadge priority={task.priority} />
+                    )}
                     {task.dueDate && (
-                        <Badge variant="outline">
+                        <Badge
+                            variant={
+                                task.dueDate < now ? 'destructive' : 'outline'
+                            }
+                        >
                             До {formatDateTime(task.dueDate)}
                         </Badge>
                     )}
@@ -299,6 +305,9 @@ export const TaskCard = ({
                                                             <SelectValue placeholder="Выберите приоритет" />
                                                         </SelectTrigger>
                                                         <SelectContent>
+                                                            <SelectItem value="none">
+                                                                Не указан
+                                                            </SelectItem>
                                                             <SelectItem value="low">
                                                                 Низкий
                                                             </SelectItem>
@@ -337,19 +346,9 @@ export const TaskCard = ({
                                                     </FieldLabel>
                                                     <Select
                                                         name={field.name}
-                                                        value={
-                                                            field.value ??
-                                                            'unassigned'
-                                                        }
-                                                        onValueChange={(
-                                                            value
-                                                        ) =>
-                                                            field.onChange(
-                                                                value ===
-                                                                    'unassigned'
-                                                                    ? undefined
-                                                                    : value
-                                                            )
+                                                        value={field.value}
+                                                        onValueChange={
+                                                            field.onChange
                                                         }
                                                     >
                                                         <SelectTrigger
@@ -361,7 +360,7 @@ export const TaskCard = ({
                                                             <SelectValue placeholder="Выберите исполнителя" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="unassigned">
+                                                            <SelectItem value="none">
                                                                 Не назначен
                                                             </SelectItem>
                                                             {members.map(

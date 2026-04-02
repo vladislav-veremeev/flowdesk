@@ -3,7 +3,6 @@ import {
     createColumn,
     deleteColumn,
     getColumnsByBoard,
-    reorderColumns,
     updateColumn,
 } from "./columns.service";
 
@@ -72,28 +71,6 @@ export async function updateColumnController(req: Request, res: Response) {
                 error instanceof Error
                     ? error.message
                     : "Ошибка обновления колонки",
-        });
-    }
-}
-
-export async function reorderColumnsController(req: Request, res: Response) {
-    try {
-        const userId = req.user?.id;
-        const boardId = req.params.boardId as string;
-
-        if (!userId) {
-            return res.status(401).json({ message: "Не авторизован" });
-        }
-
-        await reorderColumns(userId, boardId, req.body);
-
-        return res.status(200).json({ message: "Колонки переупорядочены" });
-    } catch (error) {
-        return res.status(400).json({
-            message:
-                error instanceof Error
-                    ? error.message
-                    : "Ошибка изменения порядка колонок",
         });
     }
 }

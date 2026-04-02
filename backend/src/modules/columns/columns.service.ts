@@ -3,7 +3,6 @@ import {
     Column,
     ColumnRow,
     CreateColumnBody,
-    ReorderColumnsBody,
     UpdateColumnBody,
 } from "./columns.types";
 import { ensureBoardMember, ensureBoardOwner } from "../boards/boards.access";
@@ -96,36 +95,6 @@ export async function updateColumn(
     );
 
     return mapColumn(result.rows[0]);
-}
-
-export async function reorderColumns(
-    userId: string,
-    boardId: string,
-    data: ReorderColumnsBody
-): Promise<void> {
-    await ensureBoardOwner(boardId, userId);
-
-    const client = await pool.connect();
-
-    try {
-        await client.query("BEGIN");
-
-        for (let index = 0; index < data.orderedIds.length; index++) {
-            await client.query(
-                `UPDATE board_columns
-                 SET position = $1
-                 WHERE id = $2 AND board_id = $3`,
-                [index + 1, data.orderedIds[index], boardId]
-            );
-        }
-
-        await client.query("COMMIT");
-    } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-    } finally {
-        client.release();
-    }
 }
 
 export async function deleteColumn(userId: string, columnId: string): Promise<void> {

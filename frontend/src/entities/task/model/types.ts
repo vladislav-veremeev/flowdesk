@@ -4,7 +4,7 @@ export interface Task {
     id: string
     title: string
     description: string | null
-    priority: TaskPriority
+    priority: TaskPriority | null
     position: number
     boardId: string
     columnId: string

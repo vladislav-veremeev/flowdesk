@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, MailPlus, Send } from 'lucide-react'
+import { ArrowLeft, BarChart3, MailPlus, Send, UserRound } from 'lucide-react'
 import { Controller, type UseFormReturn } from 'react-hook-form'
 
 import { Badge } from '@/components/ui/badge'
@@ -23,18 +23,9 @@ import {
     ItemTitle,
 } from '@/components/ui/item.tsx'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field.tsx'
-import type { InviteFormValues } from '@/pages/board'
-
-type BoardMember = {
-    userId: string
-    username: string
-    role: 'owner' | 'member'
-}
-
-type Board = {
-    title: string
-    description?: string | null
-}
+import type { InviteFormValues } from '@/entities/board-invitation'
+import type { Board } from '@/entities/board'
+import type { BoardMember } from '@/entities/board-member'
 
 type BoardPageHeaderProps = {
     board: Board
@@ -66,14 +57,13 @@ export const BoardPageHeader = ({
                     {members.map((member) => (
                         <Badge
                             key={member.userId}
-                            variant={
-                                member.role === 'owner' ? 'default' : 'outline'
-                            }
-                            className={
-                                member.role === 'member' ? 'bg-background' : ''
-                            }
+                            variant="outline"
+                            className="bg-background"
                         >
-                            {member.username}
+                            <UserRound />
+                            {member.role === 'owner'
+                                ? `${member.username} - владелец`
+                                : member.username}
                         </Badge>
                     ))}
                 </ItemTitle>
@@ -164,6 +154,13 @@ export const BoardPageHeader = ({
                         </DialogContent>
                     </Dialog>
                 )}
+
+                <Button asChild variant="outline">
+                    <Link to={`/boards/${board.id}/stats`}>
+                        <BarChart3 />
+                        Статистика
+                    </Link>
+                </Button>
 
                 <Button asChild variant="outline">
                     <Link to="/">

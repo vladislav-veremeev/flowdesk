@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, ExternalLink, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-
-import type { IncomingInvitation } from '@/entities/invitation'
+import type { IncomingInvitation } from '@/entities/board-invitation'
 import {
     acceptBoardInvitation,
     declineBoardInvitation,
     deleteBoardInvitation,
     getMyInvitations,
 } from '@/features/board-invitations'
-import { formatDateTime } from '@/shared/lib'
+import { formatDateTime, handleApiError } from '@/shared/lib'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,7 +42,7 @@ const getStatusVariant = (status: IncomingInvitation['status']) => {
         case 'accepted':
             return 'default'
         case 'declined':
-            return 'secondary'
+            return 'destructive'
         default:
             return 'outline'
     }
@@ -51,7 +50,6 @@ const getStatusVariant = (status: IncomingInvitation['status']) => {
 
 export const InvitationsPage = () => {
     const [invitations, setInvitations] = useState<IncomingInvitation[]>([])
-    const [processingId, setProcessingId] = useState<string | null>(null)
 
     useEffect(() => {
         const loadInvitations = async () => {
@@ -71,7 +69,6 @@ export const InvitationsPage = () => {
 
     const handleDelete = async (invitationId: string) => {
         try {
-            setProcessingId(invitationId)
             await deleteBoardInvitation(invitationId)
 
             setInvitations((current) =>
@@ -80,18 +77,12 @@ export const InvitationsPage = () => {
 
             toast.success('Приглашение удалено')
         } catch (error: any) {
-            toast.error(
-                error.response?.data?.message ||
-                    'Не удалось удалить приглашение'
-            )
-        } finally {
-            setProcessingId(null)
+            handleApiError(error, 'Не удалось удалить приглашение')
         }
     }
 
     const handleAccept = async (invitationId: string) => {
         try {
-            setProcessingId(invitationId)
             await acceptBoardInvitation(invitationId)
 
             setInvitations((current) =>
@@ -108,18 +99,12 @@ export const InvitationsPage = () => {
 
             toast.success('Приглашение принято')
         } catch (error: any) {
-            toast.error(
-                error.response?.data?.message ||
-                    'Не удалось принять приглашение'
-            )
-        } finally {
-            setProcessingId(null)
+            handleApiError(error, 'Не удалось принять приглашение')
         }
     }
 
     const handleDecline = async (invitationId: string) => {
         try {
-            setProcessingId(invitationId)
             await declineBoardInvitation(invitationId)
 
             setInvitations((current) =>
@@ -136,12 +121,7 @@ export const InvitationsPage = () => {
 
             toast.success('Приглашение отклонено')
         } catch (error: any) {
-            toast.error(
-                error.response?.data?.message ||
-                    'Не удалось отклонить приглашение'
-            )
-        } finally {
-            setProcessingId(null)
+            handleApiError(error, 'Не удалось отклонить приглашение')
         }
     }
 
@@ -155,7 +135,7 @@ export const InvitationsPage = () => {
                     </CardDescription>
                 </CardHeader>
 
-                <CardContent>
+                <CardContent className="flex flex-col gap-6">
                     {invitations.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             У вас пока нет приглашений на доски.
@@ -164,7 +144,6 @@ export const InvitationsPage = () => {
                         invitations.map((invitation) => {
                             const isPending = invitation.status === 'pending'
                             const isAccepted = invitation.status === 'accepted'
-                            const isProcessing = processingId === invitation.id
 
                             return (
                                 <Card key={invitation.id}>
@@ -226,7 +205,6 @@ export const InvitationsPage = () => {
                                                                 invitation.id
                                                             )
                                                         }
-                                                        disabled={isProcessing}
                                                     >
                                                         <Check />
                                                         Принять
@@ -240,7 +218,6 @@ export const InvitationsPage = () => {
                                                                 invitation.id
                                                             )
                                                         }
-                                                        disabled={isProcessing}
                                                     >
                                                         <X />
                                                         Отклонить
@@ -266,7 +243,6 @@ export const InvitationsPage = () => {
                                                             invitation.id
                                                         )
                                                     }
-                                                    disabled={isProcessing}
                                                 >
                                                     <Trash2 />
                                                     Удалить

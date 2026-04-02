@@ -12,7 +12,7 @@ export const getTasks = async (boardId: string) => {
 export const createTask = async (payload: {
     title: string
     description?: string
-    priority?: TaskPriority
+    priority?: TaskPriority | null
     boardId: string
     columnId: string
     dueDate?: string | null
@@ -27,7 +27,7 @@ export const updateTask = async (
     payload: {
         title: string
         description?: string
-        priority?: TaskPriority
+        priority?: TaskPriority | null
         dueDate?: string | null
         assigneeId?: string | null
     }

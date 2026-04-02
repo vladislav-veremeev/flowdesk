@@ -1,5 +1,5 @@
 import { Controller, type UseFormReturn } from 'react-hook-form'
-import { LogOut, Pencil, Save, Trash2 } from 'lucide-react'
+import { LogOut, Pencil, Save, Trash2, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Board } from '@/entities/board'
 import { Button } from '@/components/ui/button'
@@ -109,23 +109,20 @@ export const BoardCard = ({
                 </Link>
                 <CardDescription className="flex gap-2">
                     {members.map((member) => (
-                        <Badge
-                            key={member.userId}
-                            variant={
-                                member.role === 'owner' ? 'default' : 'outline'
-                            }
-                            className={
-                                member.role === 'member' ? 'bg-background' : ''
-                            }
-                        >
-                            {member.username}
+                        <Badge key={member.userId} variant="outline">
+                            <UserRound />
+                            {member.role === 'owner'
+                                ? `${member.username} - владелец`
+                                : member.username}
                         </Badge>
                     ))}
                 </CardDescription>
             </CardHeader>
 
             {board.description && (
-                <CardContent>{board.description}</CardContent>
+                <CardContent className="text-sm">
+                    {board.description}
+                </CardContent>
             )}
 
             <CardFooter>

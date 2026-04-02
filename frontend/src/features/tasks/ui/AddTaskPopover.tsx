@@ -25,14 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-
-export type TaskFormValues = {
-    title: string
-    description?: string
-    priority: 'low' | 'medium' | 'high'
-    dueDate?: string
-    assigneeId?: string
-}
+import type { TaskFormValues } from '@/entities/task'
 
 type AddTaskPopoverProps = {
     columnId: string
@@ -150,6 +143,9 @@ export const AddTaskPopover = ({
                                             <SelectValue placeholder="Выберите приоритет" />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="none">
+                                                Не указан
+                                            </SelectItem>
                                             <SelectItem value="low">
                                                 Низкий
                                             </SelectItem>
@@ -182,14 +178,8 @@ export const AddTaskPopover = ({
                                     </FieldLabel>
                                     <Select
                                         name={field.name}
-                                        value={field.value ?? 'unassigned'}
-                                        onValueChange={(value) =>
-                                            field.onChange(
-                                                value === 'unassigned'
-                                                    ? undefined
-                                                    : value
-                                            )
-                                        }
+                                        value={field.value}
+                                        onValueChange={field.onChange}
                                     >
                                         <SelectTrigger
                                             id={`task-assignee-${columnId}`}
@@ -198,7 +188,7 @@ export const AddTaskPopover = ({
                                             <SelectValue placeholder="Выберите исполнителя" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="unassigned">
+                                            <SelectItem value="none">
                                                 Не назначен
                                             </SelectItem>
                                             {members.map((member) => (

@@ -5,6 +5,7 @@ import boardsRouter from "./modules/boards/boards.routes";
 import columnsRouter from "./modules/columns/columns.routes";
 import tasksRouter from "./modules/tasks/tasks.routes";
 import boardInvitationsRouter from "./modules/board-invitations/board-invitations.routes";
+import boardStatsRouter from "./modules/board-stats/board-stats.routes";
 
 const app = express();
 
@@ -27,5 +28,6 @@ app.use("/boards", boardsRouter);
 app.use("/columns", columnsRouter);
 app.use("/tasks", tasksRouter);
 app.use("/board-invitations", boardInvitationsRouter);
+app.use("/board-stats", boardStatsRouter);
 
 export default app;

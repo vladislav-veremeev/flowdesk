@@ -4,7 +4,7 @@ export type TaskRow = {
     id: string;
     title: string;
     description: string | null;
-    priority: TaskPriority;
+    priority: TaskPriority | null;
     position: number;
     board_id: string;
     column_id: string;
@@ -17,7 +17,7 @@ export type TaskRow = {
 export type CreateTaskBody = {
     title: string;
     description?: string;
-    priority?: TaskPriority;
+    priority?: TaskPriority | null;
     boardId: string;
     columnId: string;
     dueDate?: string | null;
@@ -27,7 +27,7 @@ export type CreateTaskBody = {
 export type UpdateTaskBody = {
     title: string;
     description?: string;
-    priority?: TaskPriority;
+    priority?: TaskPriority | null;
     dueDate?: string | null;
     assigneeId?: string | null;
 };
@@ -41,7 +41,7 @@ export type Task = {
     id: string;
     title: string;
     description: string | null;
-    priority: TaskPriority;
+    priority: TaskPriority | null;
     position: number;
     boardId: string;
     columnId: string;

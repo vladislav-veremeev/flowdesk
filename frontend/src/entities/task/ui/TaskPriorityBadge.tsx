@@ -1,5 +1,6 @@
 import { type TaskPriority } from '@/entities/task'
 import { Badge } from '@/components/ui/badge.tsx'
+import { Flag } from 'lucide-react'
 
 type TaskPriorityBadgeProps = {
     priority: TaskPriority
@@ -20,6 +21,7 @@ export const TaskPriorityBadge = ({ priority }: TaskPriorityBadgeProps) => {
 
     return (
         <Badge className={styles[priority]}>
+            <Flag />
             {taskPriorityLabels[priority]}
         </Badge>
     )

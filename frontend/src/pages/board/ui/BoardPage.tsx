@@ -1,16 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import {
-    closestCorners,
-    type CollisionDetection,
-    DndContext,
-    DragOverlay,
-    pointerWithin,
-} from '@dnd-kit/core'
-import {
-    horizontalListSortingStrategy,
-    SortableContext,
-} from '@dnd-kit/sortable'
+import { closestCorners, DndContext, DragOverlay } from '@dnd-kit/core'
 
 import { userStore } from '@/entities/user'
 import { ColumnCard } from '@/entities/column'
@@ -18,8 +8,6 @@ import { TaskCard } from '@/entities/task'
 import { AddColumnPopover } from '@/features/columns'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card.tsx'
-
-
 import {
     Item,
     ItemActions,
@@ -27,54 +15,20 @@ import {
     ItemDescription,
     ItemTitle,
 } from '@/components/ui/item.tsx'
-import { useBoardPage } from '../model/useBoardPage'
-import { parseSortableId, useBoardDnd } from '../model/useBoardDnd'
-
-
 import { BoardPageHeader } from '@/pages/board'
 
-const getColumnSortableId = (columnId: string) => `column-${columnId}`
+import { useBoardPage } from '../model/useBoardPage'
+import { useBoardDnd } from '../model/useBoardDnd'
 
 export const BoardPage = () => {
     const { id } = useParams<{ id: string }>()
     const user = userStore((state) => state.user)
-
-    const collisionDetection: CollisionDetection = (args) => {
-        const activeParsed = parseSortableId(args.active.id)
-
-        if (!activeParsed) {
-            return closestCorners(args)
-        }
-
-        if (activeParsed.type === 'column') {
-            const columnContainers = args.droppableContainers.filter(
-                (container) => {
-                    const parsed = parseSortableId(container.id)
-                    return parsed?.type === 'column'
-                }
-            )
-
-            return closestCorners({
-                ...args,
-                droppableContainers: columnContainers,
-            })
-        }
-
-        const pointerCollisions = pointerWithin(args)
-
-        if (pointerCollisions.length > 0) {
-            return pointerCollisions
-        }
-
-        return closestCorners(args)
-    }
 
     const {
         board,
         members,
         columns,
         tasks,
-        setColumns,
         setTasks,
         addColumnOpen,
         setAddColumnOpen,
@@ -101,9 +55,7 @@ export const BoardPage = () => {
 
     const {
         sensors,
-        sortedColumns,
         tasksByColumn,
-        activeColumn,
         activeTask,
         handleDragStart,
         handleDragOver,
@@ -113,7 +65,6 @@ export const BoardPage = () => {
         boardId: id,
         columns,
         tasks,
-        setColumns,
         setTasks,
     })
 
@@ -144,7 +95,6 @@ export const BoardPage = () => {
                         <ItemTitle className="text-xl">
                             Доска не найдена
                         </ItemTitle>
-
                         <ItemDescription>
                             {loadError ||
                                 'Возможно, доска была удалена или у вас нет к ней доступа.'}
@@ -178,59 +128,22 @@ export const BoardPage = () => {
             />
 
             <DndContext
-                collisionDetection={collisionDetection}
+                collisionDetection={closestCorners}
                 sensors={sensors}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDragCancel={handleDragCancel}
                 onDragEnd={handleDragEnd}
             >
-                <SortableContext
-                    items={sortedColumns.map((column) =>
-                        getColumnSortableId(column.id)
-                    )}
-                    strategy={horizontalListSortingStrategy}
-                >
-                    <div className="flex overflow-x-auto h-full gap-6">
-                        {tasksByColumn.map((column) => (
-                            <ColumnCard
-                                canManageColumn={isOwner}
-                                key={column.id}
-                                column={column}
-                                addTaskOpenColumnId={addTaskOpenColumnId}
-                                taskForm={taskForm}
-                                members={members}
-                                onOpenAddTask={handleOpenAddTask}
-                                onResetTaskForm={resetTaskForm}
-                                onAddTask={handleAddTask}
-                                onEditTask={handleEditTask}
-                                onDeleteTask={handleDeleteTask}
-                                onEditColumn={handleEditColumn}
-                                onDeleteColumn={handleDeleteColumn}
-                            />
-                        ))}
-
-                        {isOwner && (
-                            <Card className="p-0 min-w-80 h-fit">
-                                <AddColumnPopover
-                                    open={addColumnOpen}
-                                    onOpenChange={setAddColumnOpen}
-                                    form={columnForm}
-                                    onSubmit={handleAddColumn}
-                                    onReset={resetColumnForm}
-                                />
-                            </Card>
-                        )}
-                    </div>
-                </SortableContext>
-
-                <DragOverlay>
-                    {activeColumn ? (
+                <div className="flex h-full gap-6 overflow-x-auto">
+                    {tasksByColumn.map((column) => (
                         <ColumnCard
-                            members={members}
-                            column={activeColumn}
-                            addTaskOpenColumnId={null}
+                            key={column.id}
+                            column={column}
+                            canManageColumn={isOwner}
+                            addTaskOpenColumnId={addTaskOpenColumnId}
                             taskForm={taskForm}
+                            members={members}
                             onOpenAddTask={handleOpenAddTask}
                             onResetTaskForm={resetTaskForm}
                             onAddTask={handleAddTask}
@@ -238,14 +151,29 @@ export const BoardPage = () => {
                             onDeleteTask={handleDeleteTask}
                             onEditColumn={handleEditColumn}
                             onDeleteColumn={handleDeleteColumn}
-                            isOverlay
                         />
-                    ) : activeTask ? (
+                    ))}
+
+                    {isOwner && (
+                        <Card className="h-fit min-w-80 p-0">
+                            <AddColumnPopover
+                                open={addColumnOpen}
+                                onOpenChange={setAddColumnOpen}
+                                form={columnForm}
+                                onSubmit={handleAddColumn}
+                                onReset={resetColumnForm}
+                            />
+                        </Card>
+                    )}
+                </div>
+
+                <DragOverlay>
+                    {activeTask ? (
                         <TaskCard
                             task={activeTask}
+                            members={members}
                             onEdit={handleEditTask}
                             onDelete={handleDeleteTask}
-                            members={members}
                             isOverlay
                         />
                     ) : null}

@@ -13,24 +13,13 @@ import { toast } from 'sonner'
 
 import type { Column } from '@/entities/column'
 import type { Task } from '@/entities/task'
-import { reorderColumns } from '@/features/columns'
 import { moveTask as moveTaskApi } from '@/features/tasks'
 
 export const parseSortableId = (sortableId: string | number) => {
     const value = String(sortableId)
 
-    if (value.startsWith('column-')) {
-        return {
-            type: 'column' as const,
-            id: value.replace('column-', ''),
-        }
-    }
-
     if (value.startsWith('task-')) {
-        return {
-            type: 'task' as const,
-            id: value.replace('task-', ''),
-        }
+        return value.replace('task-', '')
     }
 
     return null
@@ -40,7 +29,6 @@ type UseBoardDndParams = {
     boardId?: string
     columns: Column[]
     tasks: Task[]
-    setColumns: React.Dispatch<React.SetStateAction<Column[]>>
     setTasks: React.Dispatch<React.SetStateAction<Task[]>>
 }
 
@@ -48,19 +36,15 @@ export const useBoardDnd = ({
     boardId,
     columns,
     tasks,
-    setColumns,
     setTasks,
 }: UseBoardDndParams) => {
-    const [activeColumnId, setActiveColumnId] = useState<string | null>(null)
     const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
-
-    const previousColumnsRef = useRef<Column[]>([])
     const previousTasksRef = useRef<Task[]>([])
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 6,
+                distance: 10,
             },
         }),
         useSensor(KeyboardSensor, {
@@ -68,19 +52,19 @@ export const useBoardDnd = ({
         })
     )
 
-    const sortedColumns = useMemo(
+    const orderedColumns = useMemo(
         () => [...columns].sort((a, b) => a.position - b.position),
         [columns]
     )
 
     const tasksByColumn = useMemo(() => {
-        return sortedColumns.map((column) => ({
+        return orderedColumns.map((column) => ({
             ...column,
             tasks: tasks
                 .filter((task) => task.columnId === column.id)
                 .sort((a, b) => a.position - b.position),
         }))
-    }, [sortedColumns, tasks])
+    }, [orderedColumns, tasks])
 
     const findTaskById = (taskId: string) => {
         return tasks.find((task) => task.id === taskId) ?? null
@@ -91,18 +75,14 @@ export const useBoardDnd = ({
         return task?.columnId ?? null
     }
 
-    const findContainerId = (sortableId: string | number) => {
-        const parsed = parseSortableId(sortableId)
+    const findContainerId = (id: string | number) => {
+        const taskId = parseSortableId(id)
 
-        if (!parsed) {
-            return null
+        if (taskId) {
+            return findColumnByTaskId(taskId)
         }
 
-        if (parsed.type === 'column') {
-            return parsed.id
-        }
-
-        return findColumnByTaskId(parsed.id)
+        return String(id)
     }
 
     const buildTasksWithPositions = (items: Task[]) => {
@@ -126,18 +106,6 @@ export const useBoardDnd = ({
         activeTaskId: string
         overId: string | number
     }) => {
-        const activeTask = findTaskById(activeTaskId)
-
-        if (!activeTask) {
-            return
-        }
-
-        const overContainerId = findContainerId(overId)
-
-        if (!overContainerId) {
-            return
-        }
-
         setTasks((currentTasks) => {
             const currentActiveTask = currentTasks.find(
                 (task) => task.id === activeTaskId
@@ -147,12 +115,22 @@ export const useBoardDnd = ({
                 return currentTasks
             }
 
-            const sourceTasks = currentTasks.filter(
-                (task) => task.columnId === currentActiveTask.columnId
-            )
-            const destinationTasks = currentTasks.filter(
-                (task) => task.columnId === overContainerId
-            )
+            const overTaskId = parseSortableId(overId)
+            const overContainerId = overTaskId
+                ? currentTasks.find((task) => task.id === overTaskId)?.columnId
+                : String(overId)
+
+            if (!overContainerId) {
+                return currentTasks
+            }
+
+            const sourceTasks = currentTasks
+                .filter((task) => task.columnId === currentActiveTask.columnId)
+                .sort((a, b) => a.position - b.position)
+
+            const destinationTasks = currentTasks
+                .filter((task) => task.columnId === overContainerId)
+                .sort((a, b) => a.position - b.position)
 
             const activeIndex = sourceTasks.findIndex(
                 (task) => task.id === activeTaskId
@@ -162,15 +140,13 @@ export const useBoardDnd = ({
                 return currentTasks
             }
 
-            const overParsed = parseSortableId(overId)
-
             if (currentActiveTask.columnId === overContainerId) {
-                if (!overParsed || overParsed.type !== 'task') {
+                if (!overTaskId) {
                     return currentTasks
                 }
 
                 const overIndex = sourceTasks.findIndex(
-                    (task) => task.id === overParsed.id
+                    (task) => task.id === overTaskId
                 )
 
                 if (overIndex === -1 || overIndex === activeIndex) {
@@ -202,12 +178,9 @@ export const useBoardDnd = ({
                 (task) => task.id !== activeTaskId
             )
 
-            const overIndex =
-                overParsed?.type === 'task'
-                    ? destinationTasks.findIndex(
-                          (task) => task.id === overParsed.id
-                      )
-                    : destinationTasks.length
+            const overIndex = overTaskId
+                ? destinationTasks.findIndex((task) => task.id === overTaskId)
+                : destinationTasks.length
 
             const nextDestinationTasks = [...destinationTasks]
             nextDestinationTasks.splice(
@@ -231,157 +204,97 @@ export const useBoardDnd = ({
     }
 
     const handleDragStart = (event: DragStartEvent) => {
-        const parsed = parseSortableId(event.active.id)
+        const taskId = parseSortableId(event.active.id)
 
-        previousColumnsRef.current = columns
-        previousTasksRef.current = tasks
-
-        if (!parsed) {
+        if (!taskId) {
             return
         }
 
-        if (parsed.type === 'column') {
-            setActiveColumnId(parsed.id)
-        }
-
-        if (parsed.type === 'task') {
-            setActiveTaskId(parsed.id)
-        }
+        previousTasksRef.current = tasks
+        setActiveTaskId(taskId)
     }
 
     const handleDragOver = (event: DragOverEvent) => {
-        if (!activeTaskId || !event.over) {
+        if (!event.over) {
             return
         }
 
-        const activeParsed = parseSortableId(event.active.id)
-        const overParsed = parseSortableId(event.over.id)
+        const activeTaskId = parseSortableId(event.active.id)
 
-        if (!activeParsed || activeParsed.type !== 'task' || !overParsed) {
+        if (!activeTaskId) {
             return
         }
 
         moveTaskInState({
-            activeTaskId: activeParsed.id,
+            activeTaskId,
             overId: event.over.id,
         })
     }
 
     const handleDragCancel = () => {
-        setColumns(previousColumnsRef.current)
         setTasks(previousTasksRef.current)
-        setActiveColumnId(null)
         setActiveTaskId(null)
     }
 
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event
+        const activeTaskId = parseSortableId(active.id)
 
-        setActiveColumnId(null)
         setActiveTaskId(null)
 
-        if (!over) {
-            setColumns(previousColumnsRef.current)
+        if (!activeTaskId || !over) {
             setTasks(previousTasksRef.current)
             return
         }
 
-        const activeParsed = parseSortableId(active.id)
-        const overParsed = parseSortableId(over.id)
+        const movedTask = tasks.find((task) => task.id === activeTaskId)
 
-        if (!activeParsed || !overParsed) {
-            setColumns(previousColumnsRef.current)
+        if (!movedTask) {
             setTasks(previousTasksRef.current)
             return
         }
 
-        if (activeParsed.type === 'column' && overParsed.type === 'column') {
-            const oldIndex = sortedColumns.findIndex(
-                (column) => column.id === activeParsed.id
-            )
-            const newIndex = sortedColumns.findIndex(
-                (column) => column.id === overParsed.id
-            )
+        const targetColumnId = findContainerId(over.id)
 
-            if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
-                return
-            }
-
-            const reorderedColumns = arrayMove(
-                sortedColumns,
-                oldIndex,
-                newIndex
-            ).map((column, index) => ({
-                ...column,
-                position: index + 1,
-            }))
-
-            setColumns(reorderedColumns)
-
-            try {
-                if (!boardId) {
-                    throw new Error('Board id is required')
-                }
-
-                await reorderColumns(
-                    boardId,
-                    reorderedColumns.map((column) => column.id)
-                )
-            } catch (error: any) {
-                setColumns(previousColumnsRef.current)
-                toast.error(
-                    error.response?.data?.message ||
-                        'Не удалось сохранить порядок колонок'
-                )
-            }
-
+        if (!targetColumnId) {
+            setTasks(previousTasksRef.current)
             return
         }
 
-        if (activeParsed.type === 'task') {
-            const movedTask = tasks.find((task) => task.id === activeParsed.id)
+        const targetPosition =
+            tasks
+                .filter((task) => task.columnId === movedTask.columnId)
+                .sort((a, b) => a.position - b.position)
+                .findIndex((task) => task.id === movedTask.id) + 1
 
-            if (!movedTask) {
-                setTasks(previousTasksRef.current)
-                return
+        if (targetPosition < 1) {
+            setTasks(previousTasksRef.current)
+            return
+        }
+
+        try {
+            if (!boardId) {
+                throw new Error('Board id is required')
             }
 
-            const targetColumnId = movedTask.columnId
-            const targetPosition =
-                tasks
-                    .filter((task) => task.columnId === targetColumnId)
-                    .sort((a, b) => a.position - b.position)
-                    .findIndex((task) => task.id === movedTask.id) + 1
+            const updatedTask = await moveTaskApi(activeTaskId, {
+                targetColumnId,
+                targetPosition,
+            })
 
-            if (!targetColumnId || targetPosition < 1) {
-                setTasks(previousTasksRef.current)
-                return
-            }
-
-            try {
-                const updatedTask = await moveTaskApi(activeParsed.id, {
-                    targetColumnId,
-                    targetPosition,
-                })
-
-                setTasks((current) =>
-                    current.map((task) =>
-                        task.id === activeParsed.id ? updatedTask : task
-                    )
+            setTasks((currentTasks) =>
+                currentTasks.map((task) =>
+                    task.id === activeTaskId ? updatedTask : task
                 )
-            } catch (error: any) {
-                setTasks(previousTasksRef.current)
-                toast.error(
-                    error.response?.data?.message ||
-                        'Не удалось сохранить перемещение задачи'
-                )
-            }
+            )
+        } catch (error: any) {
+            setTasks(previousTasksRef.current)
+            toast.error(
+                error.response?.data?.message ||
+                    'Не удалось сохранить перемещение задачи'
+            )
         }
     }
-
-    const activeColumn = activeColumnId
-        ? (tasksByColumn.find((column) => column.id === activeColumnId) ?? null)
-        : null
 
     const activeTask = activeTaskId
         ? (tasks.find((task) => task.id === activeTaskId) ?? null)
@@ -389,9 +302,7 @@ export const useBoardDnd = ({
 
     return {
         sensors,
-        sortedColumns,
         tasksByColumn,
-        activeColumn,
         activeTask,
         handleDragStart,
         handleDragOver,

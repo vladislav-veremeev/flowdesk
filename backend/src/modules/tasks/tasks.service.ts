@@ -7,6 +7,12 @@ import {
     UpdateTaskBody,
 } from "./tasks.types";
 import { ensureBoardMember } from "../boards/boards.access";
+import { getColumnKindById } from "./tasks.stats.helpers";
+
+type BoardColumnRow = {
+    id: string;
+    position: number;
+};
 
 function mapTask(row: TaskRow): Task {
     return {
@@ -53,32 +59,6 @@ async function ensureColumnBelongsToBoard(columnId: string, boardId: string) {
     }
 }
 
-async function checkWipLimit(columnId: string) {
-    const columnResult = await pool.query<{ wip_limit: number | null }>(
-        `SELECT wip_limit
-         FROM board_columns
-         WHERE id = $1`,
-        [columnId]
-    );
-
-    const wipLimit = columnResult.rows[0]?.wip_limit;
-
-    if (!wipLimit) {
-        return;
-    }
-
-    const countResult = await pool.query<{ count: string }>(
-        `SELECT COUNT(*)::text AS count FROM tasks WHERE column_id = $1`,
-        [columnId]
-    );
-
-    const currentCount = Number(countResult.rows[0].count);
-
-    if (currentCount >= wipLimit) {
-        throw new Error("Превышен лимит задач колонки");
-    }
-}
-
 async function ensureTaskAssigneeBelongsToBoard(
     boardId: string,
     assigneeId?: string | null
@@ -97,6 +77,25 @@ async function ensureTaskAssigneeBelongsToBoard(
     if (result.rows.length === 0) {
         throw new Error("Назначенный пользователь не состоит в этой доске");
     }
+}
+
+async function getBoardColumns(
+    client: typeof pool | Awaited<ReturnType<typeof pool.connect>>,
+    boardId: string
+) {
+    const result = await client.query<BoardColumnRow>(
+        `SELECT id, position
+         FROM board_columns
+         WHERE board_id = $1
+         ORDER BY position ASC`,
+        [boardId]
+    );
+
+    if (result.rows.length < 2) {
+        throw new Error("Для статистики на доске должно быть минимум 2 колонки");
+    }
+
+    return result.rows;
 }
 
 export async function getTasksByBoard(userId: string, boardId: string): Promise<Task[]> {
@@ -126,37 +125,61 @@ export async function createTask(userId: string, data: CreateTaskBody): Promise<
     await ensureBoardMember(data.boardId, userId);
     await ensureColumnBelongsToBoard(data.columnId, data.boardId);
     await ensureTaskAssigneeBelongsToBoard(data.boardId, data.assigneeId);
-    await checkWipLimit(data.columnId);
 
-    const positionResult = await pool.query<{ next_position: number }>(
-        `SELECT COALESCE(MAX(position), 0) + 1 AS next_position
-         FROM tasks
-         WHERE column_id = $1`,
-        [data.columnId]
-    );
+    const client = await pool.connect();
 
-    const position = positionResult.rows[0].next_position;
+    try {
+        await client.query("BEGIN");
 
-    const result = await pool.query<TaskRow>(
-        `INSERT INTO tasks (
-            title, description, priority, position, board_id, column_id, due_date, assignee_id
-        )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-             RETURNING id, title, description, priority, position, board_id, column_id,
-                   due_date, assignee_id, created_at, updated_at`,
-        [
-            title,
-            data.description?.trim() || null,
-            data.priority || "medium",
-            position,
-            data.boardId,
-            data.columnId,
-            data.dueDate ?? null,
-            data.assigneeId ?? null,
-        ]
-    );
+        const positionResult = await client.query<{ next_position: number }>(
+            `SELECT COALESCE(MAX(position), 0) + 1 AS next_position
+             FROM tasks
+             WHERE column_id = $1`,
+            [data.columnId]
+        );
 
-    return mapTask(result.rows[0]);
+        const position = positionResult.rows[0].next_position;
+
+        const result = await client.query<TaskRow>(
+            `INSERT INTO tasks (
+                title, description, priority, position, board_id, column_id, due_date, assignee_id
+            )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 RETURNING id, title, description, priority, position, board_id, column_id,
+                       due_date, assignee_id, created_at, updated_at`,
+            [
+                title,
+                data.description?.trim() || null,
+                data.priority ?? null,
+                position,
+                data.boardId,
+                data.columnId,
+                data.dueDate ?? null,
+                data.assigneeId ?? null,
+            ]
+        );
+
+        const createdTask = result.rows[0];
+        const columns = await getBoardColumns(client, createdTask.board_id);
+        const toStage = getColumnKindById(columns, createdTask.column_id);
+
+        await client.query(
+            `INSERT INTO task_history_events (
+                board_id, task_ref, event_type, occurred_at, from_stage, to_stage
+            )
+             VALUES ($1, $2, $3, NOW(), $4, $5)`,
+            [createdTask.board_id, createdTask.id, "created", null, toStage]
+        );
+
+        await client.query("COMMIT");
+
+        return mapTask(createdTask);
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
 }
 
 export async function updateTask(
@@ -202,7 +225,7 @@ export async function updateTask(
         [
             title,
             data.description?.trim() || null,
-            data.priority || "medium",
+            data.priority ?? null,
             data.dueDate ?? null,
             data.assigneeId ?? null,
             taskId,
@@ -249,10 +272,6 @@ export async function moveTask(
 
         await ensureColumnBelongsToBoard(data.targetColumnId, task.board_id);
 
-        if (task.column_id !== data.targetColumnId) {
-            await checkWipLimit(data.targetColumnId);
-        }
-
         await client.query(
             `UPDATE tasks
              SET position = position - 1
@@ -276,6 +295,18 @@ export async function moveTask(
             [data.targetColumnId, data.targetPosition, taskId]
         );
 
+        const columns = await getBoardColumns(client, task.board_id);
+        const fromStage = getColumnKindById(columns, task.column_id);
+        const toStage = getColumnKindById(columns, data.targetColumnId);
+
+        await client.query(
+            `INSERT INTO task_history_events (
+                board_id, task_ref, event_type, occurred_at, from_stage, to_stage
+            )
+             VALUES ($1, $2, $3, NOW(), $4, $5)`,
+            [task.board_id, task.id, "moved", fromStage, toStage]
+        );
+
         await client.query("COMMIT");
 
         return mapTask(updatedResult.rows[0]);
@@ -293,8 +324,13 @@ export async function deleteTask(userId: string, taskId: string): Promise<void> 
     try {
         await client.query("BEGIN");
 
-        const taskResult = await client.query<{ board_id: string; column_id: string; position: number }>(
-            `SELECT board_id, column_id, position
+        const taskResult = await client.query<{
+            id: string;
+            board_id: string;
+            column_id: string;
+            position: number;
+        }>(
+            `SELECT id, board_id, column_id, position
              FROM tasks
              WHERE id = $1`,
             [taskId]
@@ -307,6 +343,17 @@ export async function deleteTask(userId: string, taskId: string): Promise<void> 
         }
 
         await ensureBoardMember(task.board_id, userId);
+
+        const columns = await getBoardColumns(client, task.board_id);
+        const fromStage = getColumnKindById(columns, task.column_id);
+
+        await client.query(
+            `INSERT INTO task_history_events (
+                board_id, task_ref, event_type, occurred_at, from_stage, to_stage
+            )
+             VALUES ($1, $2, $3, NOW(), $4, $5)`,
+            [task.board_id, task.id, "deleted", fromStage, null]
+        );
 
         const deleteResult = await client.query(
             `DELETE FROM tasks

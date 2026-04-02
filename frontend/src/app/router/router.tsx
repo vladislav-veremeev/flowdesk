@@ -8,6 +8,7 @@ import { ProfilePage } from '@/pages/profile'
 import { HomePage } from '@/pages/home'
 import { BoardPage } from '@/pages/board'
 import { InvitationsPage } from '@/pages/invitations'
+import { BoardStatsPage } from '@/pages/board-stats'
 
 export const router = createBrowserRouter([
     {
@@ -40,6 +41,10 @@ export const router = createBrowserRouter([
             {
                 path: '/boards/:id',
                 element: <BoardPage />,
+            },
+            {
+                path: '/boards/:id/stats',
+                element: <BoardStatsPage />,
             },
             {
                 path: '/invitations',

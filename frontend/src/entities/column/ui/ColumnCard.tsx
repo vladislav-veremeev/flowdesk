@@ -1,13 +1,17 @@
+import { useState } from 'react'
 import { Controller, useForm, type UseFormReturn } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Pencil, Trash2 } from 'lucide-react'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { useDroppable } from '@dnd-kit/core'
+
 import {
     type Column,
     type ColumnFormValues,
     columnSchema,
 } from '@/entities/column'
 import type { BoardMember } from '@/entities/board-member'
-import { type Task, type TaskFormValues } from '@/entities/task'
-import { TaskCard } from '@/entities/task'
+import { type Task, type TaskFormValues, TaskCard } from '@/entities/task'
 import {
     Card,
     CardAction,
@@ -34,10 +38,9 @@ import {
 } from '@/components/ui/popover'
 import { ItemGroup } from '@/components/ui/item'
 import { Badge } from '@/components/ui/badge.tsx'
-import { useMemo, useState } from 'react'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { ButtonGroup } from '@/components/ui/button-group.tsx'
 import {
+    AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
@@ -46,16 +49,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-    AlertDialog,
 } from '@/components/ui/alert-dialog.tsx'
 import { AddTaskPopover } from '@/features/tasks'
-import {
-    SortableContext,
-    useSortable,
-    verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { cn } from '@/lib/utils.ts'
 
 type ColumnWithTasks = Column & {
     tasks: Task[]
@@ -77,7 +72,6 @@ type ColumnCardProps = {
     canManageColumn?: boolean
 }
 
-const getColumnSortableId = (columnId: string) => `column-${columnId}`
 const getTaskSortableId = (taskId: string) => `task-${taskId}`
 
 export const ColumnCard = ({
@@ -92,10 +86,17 @@ export const ColumnCard = ({
     onEditColumn,
     onDeleteTask,
     onDeleteColumn,
-    isOverlay = false,
     canManageColumn = true,
 }: ColumnCardProps) => {
     const [editOpen, setEditOpen] = useState(false)
+
+    const { setNodeRef } = useDroppable({
+        id: column.id,
+        data: {
+            type: 'column',
+            columnId: column.id,
+        },
+    })
 
     const editColumnForm = useForm<ColumnFormValues>({
         resolver: zodResolver(columnSchema),
@@ -105,35 +106,10 @@ export const ColumnCard = ({
         },
     })
 
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        setActivatorNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({
-        id: getColumnSortableId(column.id),
-        data: {
-            type: 'column',
-            columnId: column.id,
-        },
-        disabled: isOverlay || !canManageColumn,
-    })
-
-    const style = useMemo(
-        () => ({
-            transform: CSS.Transform.toString(transform),
-            transition,
-        }),
-        [transform, transition]
-    )
-
     const tasksCount = column.tasks.length
     const wipLimit = column.wipLimit ?? null
     const hasWipLimit = wipLimit !== null
-    const isWipLimitReached = hasWipLimit && tasksCount >= wipLimit
+    const isWipLimitExceeded = hasWipLimit && tasksCount > wipLimit
 
     const handleEditOpenChange = (open: boolean) => {
         setEditOpen(open)
@@ -152,27 +128,13 @@ export const ColumnCard = ({
     }
 
     return (
-        <Card
-            ref={setNodeRef}
-            style={style}
-            className={cn(
-                'min-w-80 h-fit py-4 gap-4',
-                isDragging ? 'opacity-50' : '',
-                isOverlay ? 'shadow-lg' : ''
-            )}
-        >
+        <Card className={`min-w-80 h-fit py-4 gap-4`}>
             <CardHeader className="px-4">
-                <CardTitle
-                    className={cn(
-                        'flex gap-2 items-center',
-                        canManageColumn && 'cursor-grab'
-                    )}
-                    ref={setActivatorNodeRef}
-                    {...attributes}
-                    {...listeners}
-                >
+                <CardTitle className="flex items-center gap-2">
                     {column.title}
-                    <Badge variant="outline">
+                    <Badge
+                        variant={isWipLimitExceeded ? 'destructive' : 'outline'}
+                    >
                         {hasWipLimit
                             ? `${tasksCount}/${column.wipLimit} задач`
                             : `${tasksCount} задач`}
@@ -267,8 +229,8 @@ export const ColumnCard = ({
                                                             {...field}
                                                             id={`edit-column-wip-limit-${column.id}`}
                                                             type="number"
-                                                            min={tasksCount}
                                                             placeholder="Введите лимит"
+                                                            min={0}
                                                             aria-invalid={
                                                                 fieldState.invalid
                                                             }
@@ -336,7 +298,7 @@ export const ColumnCard = ({
                 )}
             </CardHeader>
 
-            <CardContent className="px-4">
+            <CardContent ref={setNodeRef} className="px-4">
                 <SortableContext
                     items={column.tasks.map((task) =>
                         getTaskSortableId(task.id)
@@ -367,7 +329,6 @@ export const ColumnCard = ({
                 <AddTaskPopover
                     columnId={column.id}
                     open={addTaskOpenColumnId === column.id}
-                    disabled={Boolean(isWipLimitReached) || isOverlay}
                     members={members}
                     form={taskForm}
                     onOpenChange={(open) => {
