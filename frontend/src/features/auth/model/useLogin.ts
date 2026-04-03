@@ -10,9 +10,7 @@ export const useLogin = () => {
     const handleLogin = async (data: LoginDto) => {
         const result = await login(data)
 
-        localStorage.setItem('token', result.token)
         setUser(result.user)
-
         navigate('/')
     }
 

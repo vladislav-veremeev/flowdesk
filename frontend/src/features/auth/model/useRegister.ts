@@ -10,9 +10,7 @@ export const useRegister = () => {
     const handleRegister = async (data: RegisterDto) => {
         const result = await register(data)
 
-        localStorage.setItem('token', result.token)
         setUser(result.user)
-
         navigate('/')
     }
 

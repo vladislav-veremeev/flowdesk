@@ -140,7 +140,6 @@ export const ProfilePage = () => {
     const handleDelete = async () => {
         try {
             await deleteMe()
-            localStorage.removeItem('token')
             userStore.getState().clearUser()
             navigate('/login')
         } catch (error: any) {

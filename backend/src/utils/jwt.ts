@@ -13,7 +13,7 @@ export function signAccessToken(payload: AccessTokenPayload): string {
     }
 
     return jwt.sign(payload, secret, {
-        expiresIn: (process.env.JWT_EXPIRES_IN || "7d") as jwt.SignOptions["expiresIn"],
+        expiresIn: process.env.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
     });
 }
 

@@ -7,10 +7,38 @@ import {
     updateCurrentUser,
 } from "./auth.service";
 
+function getAuthCookieOptions() {
+    const isProduction = process.env.NODE_ENV === "production";
+
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax" as const,
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+}
+
+function clearAuthCookie(res: Response) {
+    const isProduction = process.env.NODE_ENV === "production";
+
+    res.clearCookie("accessToken", {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+        path: "/",
+    });
+}
+
 export async function registerController(req: Request, res: Response) {
     try {
         const result = await registerUser(req.body);
-        return res.status(201).json(result);
+
+        res.cookie("accessToken", result.token, getAuthCookieOptions());
+
+        return res.status(201).json({
+            user: result.user,
+        });
     } catch (error) {
         const message =
             error instanceof Error ? error.message : "Ошибка регистрации";
@@ -22,12 +50,23 @@ export async function registerController(req: Request, res: Response) {
 export async function loginController(req: Request, res: Response) {
     try {
         const result = await loginUser(req.body);
-        return res.status(200).json(result);
+
+        res.cookie("accessToken", result.token, getAuthCookieOptions());
+
+        return res.status(200).json({
+            user: result.user,
+        });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Ошибка входа";
 
         return res.status(401).json({ message });
     }
+}
+
+export async function logoutController(_req: Request, res: Response) {
+    clearAuthCookie(res);
+
+    return res.status(200).json({ message: "Вы вышли из системы" });
 }
 
 export async function meController(req: Request, res: Response) {
@@ -78,6 +117,7 @@ export async function deleteMeController(req: Request, res: Response) {
         }
 
         await deleteCurrentUser(userId);
+        clearAuthCookie(res);
 
         return res.status(200).json({ message: "Аккаунт удалён" });
     } catch (error) {

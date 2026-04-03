@@ -8,10 +8,15 @@ import {
 } from "./tasks.types";
 import { ensureBoardMember } from "../boards/boards.access";
 import { getColumnKindById } from "./tasks.stats.helpers";
+import {PoolClient} from "pg";
 
 type BoardColumnRow = {
     id: string;
     position: number;
+};
+
+type Queryable = {
+    query: PoolClient["query"];
 };
 
 function mapTask(row: TaskRow): Task {
@@ -28,6 +33,27 @@ function mapTask(row: TaskRow): Task {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
+}
+
+async function ensureColumnIsFirstInBoard(columnId: string, boardId: string) {
+    const result = await pool.query<{ id: string }>(
+        `SELECT id
+         FROM board_columns
+         WHERE board_id = $1
+         ORDER BY position ASC
+         LIMIT 1`,
+        [boardId]
+    );
+
+    const firstColumn = result.rows[0];
+
+    if (!firstColumn) {
+        throw new Error("На доске не найдено ни одной колонки");
+    }
+
+    if (firstColumn.id !== columnId) {
+        throw new Error("Задачу можно создать только в первой колонке");
+    }
 }
 
 function validateDueDateTime(dueDate?: string | null) {
@@ -80,7 +106,7 @@ async function ensureTaskAssigneeBelongsToBoard(
 }
 
 async function getBoardColumns(
-    client: typeof pool | Awaited<ReturnType<typeof pool.connect>>,
+    client: Queryable,
     boardId: string
 ) {
     const result = await client.query<BoardColumnRow>(
@@ -124,6 +150,7 @@ export async function createTask(userId: string, data: CreateTaskBody): Promise<
 
     await ensureBoardMember(data.boardId, userId);
     await ensureColumnBelongsToBoard(data.columnId, data.boardId);
+    await ensureColumnIsFirstInBoard(data.columnId, data.boardId);
     await ensureTaskAssigneeBelongsToBoard(data.boardId, data.assigneeId);
 
     const client = await pool.connect();

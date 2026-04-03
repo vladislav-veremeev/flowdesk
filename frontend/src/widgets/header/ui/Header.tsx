@@ -7,6 +7,7 @@ import { ButtonGroup } from '@/components/ui/button-group.tsx'
 import { userStore } from '@/entities/user'
 import { getMyInvitations } from '@/features/board-invitations'
 import { Badge } from '@/components/ui/badge.tsx'
+import { logout } from '@/features/auth'
 
 export const Header = () => {
     const user = userStore((state) => state.user)
@@ -44,10 +45,13 @@ export const Header = () => {
         }
     }, [])
 
-    const handleLogout = () => {
-        localStorage.removeItem('token')
-        userStore.getState().clearUser()
-        navigate('/login')
+    const handleLogout = async () => {
+        try {
+            await logout()
+        } finally {
+            userStore.getState().clearUser()
+            navigate('/login')
+        }
     }
 
     return (

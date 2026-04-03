@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
+
 import authRouter from "./modules/auth/auth.routes";
 import boardsRouter from "./modules/boards/boards.routes";
 import columnsRouter from "./modules/columns/columns.routes";
@@ -12,11 +14,13 @@ const app = express();
 app.use(
     cors({
         origin: process.env.CLIENT_URL,
+        credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
     })
 );
 
+app.use(cookieParser());
 app.use(express.json());
 
 app.get("/health", (_req, res) => {

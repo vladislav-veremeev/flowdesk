@@ -3,7 +3,6 @@ import type { User } from '@/entities/user'
 
 type AuthResponse = {
     user: User
-    token: string
 }
 
 type LoginPayload = {
@@ -29,6 +28,11 @@ export const login = async (payload: LoginPayload) => {
 
 export const register = async (payload: RegisterPayload) => {
     const response = await api.post<AuthResponse>('/auth/register', payload)
+    return response.data
+}
+
+export const logout = async () => {
+    const response = await api.post<{ message: string }>('/auth/logout')
     return response.data
 }
 

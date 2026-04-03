@@ -1,7 +1,7 @@
 import { Controller, type UseFormReturn } from 'react-hook-form'
 import { LogOut, Pencil, Save, Trash2, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import type { Board } from '@/entities/board'
+import type { Board, BoardFormValues } from '@/entities/board'
 import { Button } from '@/components/ui/button'
 import {
     Field,
@@ -44,11 +44,6 @@ import { getBoardMembers, leaveBoard } from '@/features/board-members'
 import { toast } from 'sonner'
 import { useEffect, useState } from 'react'
 import type { BoardMember } from '@/entities/board-member'
-
-export type BoardFormValues = {
-    title: string
-    description: string
-}
 
 type BoardCardProps = {
     board: Board

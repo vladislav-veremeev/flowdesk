@@ -7,16 +7,10 @@ export function authMiddleware(
     next: NextFunction
 ) {
     try {
-        const authorizationHeader = req.headers.authorization;
+        const token = req.cookies?.accessToken;
 
-        if (!authorizationHeader) {
+        if (!token) {
             return res.status(401).json({ message: "Токен не передан" });
-        }
-
-        const [type, token] = authorizationHeader.split(" ");
-
-        if (type !== "Bearer" || !token) {
-            return res.status(401).json({ message: "Некорректный формат токена" });
         }
 
         const payload = verifyAccessToken(token);

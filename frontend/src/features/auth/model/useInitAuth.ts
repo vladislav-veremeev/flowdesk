@@ -9,24 +9,16 @@ export const useInitAuth = () => {
 
     useEffect(() => {
         const initAuth = async () => {
-            const token = localStorage.getItem('token')
-
-            if (!token) {
-                setAuthInitialized(true)
-                return
-            }
-
             try {
                 const user = await getMe()
                 setUser(user)
             } catch {
-                localStorage.removeItem('token')
                 clearUser()
             } finally {
                 setAuthInitialized(true)
             }
         }
 
-        initAuth()
+        void initAuth()
     }, [setUser, clearUser, setAuthInitialized])
 }
